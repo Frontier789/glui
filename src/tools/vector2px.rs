@@ -3,18 +3,18 @@ extern crate num;
 use std::ops::{Add,Sub,Mul,Div,AddAssign,SubAssign,MulAssign,DivAssign,Neg};
 
 #[derive(Copy,Clone,Debug)]
-pub struct Vec2 {
+pub struct Vec2px {
     pub x: f32,
     pub y: f32
 }
 
-impl Vec2 {
+impl Vec2px {
     pub fn origin() -> Self {
-        Self{x:0.0, y:0.0}
+        Self{x:0.0,y:0.0}
     }
     
     pub fn zero() -> Self {
-        Self{x:0.0, y:0.0}
+        Self{x:0.0,y:0.0}
     }
     
     pub fn inf() -> Self {
@@ -22,7 +22,7 @@ impl Vec2 {
     }
     
     pub fn new<T: Into<f32>>(x: T, y: T) -> Self {
-        Self{x:x.into(), y:y.into()}
+        Self{x:x.into(),y:y.into()}
     }
     
     pub fn pol(len: f32, angle: f32) -> Self {
@@ -62,44 +62,44 @@ impl Vec2 {
 
 // A op B
 
-impl Add for Vec2 {
-    type Output = Vec2;
+impl Add for Vec2px {
+    type Output = Vec2px;
 
-    fn add(self, other: Vec2) -> Vec2 {
-        Vec2 {
+    fn add(self, other: Vec2px) -> Vec2px {
+        Vec2px {
             x: self.x + other.x,
             y: self.y + other.y
         }
     }
 }
 
-impl Sub for Vec2 {
-    type Output = Vec2;
+impl Sub for Vec2px {
+    type Output = Vec2px;
 
-    fn sub(self, other: Vec2) -> Vec2 {
-        Vec2 {
+    fn sub(self, other: Vec2px) -> Vec2px {
+        Vec2px {
             x: self.x - other.x,
             y: self.y - other.y
         }
     }
 }
 
-impl Mul for Vec2 {
-    type Output = Vec2;
+impl Mul for Vec2px {
+    type Output = Vec2px;
 
-    fn mul(self, other: Vec2) -> Vec2 {
-        Vec2 {
+    fn mul(self, other: Vec2px) -> Vec2px {
+        Vec2px {
             x: self.x * other.x,
             y: self.y * other.y
         }
     }
 }
 
-impl Div for Vec2 {
-    type Output = Vec2;
+impl Div for Vec2px {
+    type Output = Vec2px;
 
-    fn div(self, other: Vec2) -> Vec2 {
-        Vec2 {
+    fn div(self, other: Vec2px) -> Vec2px {
+        Vec2px {
             x: self.x / other.x,
             y: self.y / other.y
         }
@@ -108,33 +108,33 @@ impl Div for Vec2 {
 
 // A op= B
 
-impl AddAssign for Vec2 {
+impl AddAssign for Vec2px {
 
-    fn add_assign(&mut self, other: Vec2) {
+    fn add_assign(&mut self, other: Vec2px) {
         self.x += other.x;
         self.y += other.y;
     }
 }
 
-impl SubAssign for Vec2 {
+impl SubAssign for Vec2px {
 
-    fn sub_assign(&mut self, other: Vec2) {
+    fn sub_assign(&mut self, other: Vec2px) {
         self.x -= other.x;
         self.y -= other.y;
     }
 }
 
-impl MulAssign for Vec2 {
+impl MulAssign for Vec2px {
 
-    fn mul_assign(&mut self, other: Vec2) {
+    fn mul_assign(&mut self, other: Vec2px) {
         self.x *= other.x;
         self.y *= other.y;
     }
 }
 
-impl DivAssign for Vec2 {
+impl DivAssign for Vec2px {
 
-    fn div_assign(&mut self, other: Vec2) {
+    fn div_assign(&mut self, other: Vec2px) {
         self.x /= other.x;
         self.y /= other.y;
     }
@@ -142,44 +142,44 @@ impl DivAssign for Vec2 {
 
 // A op a
 
-impl Mul<f32> for Vec2 {
-    type Output = Vec2;
+impl Mul<f32> for Vec2px {
+    type Output = Vec2px;
 
-    fn mul(self, factor: f32) -> Vec2 {
-        Vec2 {
+    fn mul(self, factor: f32) -> Vec2px {
+        Vec2px {
             x: self.x * factor,
             y: self.y * factor
         }
     }
 }
 
-impl Div<f32> for Vec2 {
-    type Output = Vec2;
+impl Div<f32> for Vec2px {
+    type Output = Vec2px;
 
-    fn div(self, factor: f32) -> Vec2 {
-        Vec2 {
+    fn div(self, factor: f32) -> Vec2px {
+        Vec2px {
             x: self.x / factor,
             y: self.y / factor
         }
     }
 }
 
-impl Mul<i32> for Vec2 {
-    type Output = Vec2;
+impl Mul<i32> for Vec2px {
+    type Output = Vec2px;
 
-    fn mul(self, factor: i32) -> Vec2 {
-        Vec2 {
+    fn mul(self, factor: i32) -> Vec2px {
+        Vec2px {
             x: self.x * factor as f32,
             y: self.y * factor as f32
         }
     }
 }
 
-impl Div<i32> for Vec2 {
-    type Output = Vec2;
+impl Div<i32> for Vec2px {
+    type Output = Vec2px;
 
-    fn div(self, factor: i32) -> Vec2 {
-        Vec2 {
+    fn div(self, factor: i32) -> Vec2px {
+        Vec2px {
             x: self.x / factor as f32,
             y: self.y / factor as f32
         }
@@ -188,28 +188,28 @@ impl Div<i32> for Vec2 {
 
 // A op= a
 
-impl MulAssign<f32> for Vec2 {
+impl MulAssign<f32> for Vec2px {
     fn mul_assign(&mut self, factor: f32) {
         self.x *= factor;
         self.y *= factor;
     }
 }
 
-impl DivAssign<f32> for Vec2 {
+impl DivAssign<f32> for Vec2px {
     fn div_assign(&mut self, factor: f32) {
         self.x /= factor;
         self.y /= factor;
     }
 }
 
-impl MulAssign<i32> for Vec2 {
+impl MulAssign<i32> for Vec2px {
     fn mul_assign(&mut self, factor: i32) {
         self.x *= factor as f32;
         self.y *= factor as f32;
     }
 }
 
-impl DivAssign<i32> for Vec2 {
+impl DivAssign<i32> for Vec2px {
     fn div_assign(&mut self, factor: i32) {
         self.x /= factor as f32;
         self.y /= factor as f32;
@@ -218,15 +218,30 @@ impl DivAssign<i32> for Vec2 {
 
 // -A
 
-impl Neg for Vec2 {
-    type Output = Vec2;
+impl Neg for Vec2px {
+    type Output = Vec2px;
     
-    fn neg(self) -> Vec2 {
-        Vec2::new(
+    fn neg(self) -> Vec2px {
+        Vec2px::new(
             -self.x,
             -self.y,
         )
     }
 }
 
-// pub type Vec2f = Vec2;
+use super::vector2::Vec2;
+impl Vec2px {
+    pub fn to_pixels(&self, dpi: f32) -> Vec2 {
+        Vec2 {
+            x: self.x * dpi,
+            y: self.y * dpi,
+        }
+    }
+    
+    pub fn from_pixels(pix: Vec2, dpi: f32) -> Vec2px {
+        Vec2px {
+            x: pix.x / dpi,
+            y: pix.y / dpi,
+        }
+    }
+}

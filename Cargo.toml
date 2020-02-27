@@ -7,3 +7,4 @@ num = "0.2.1"
 gl = "0.14.0"
 image = "0.22.5"
 glui = { path = "../glui" }
+downcast-rs = "1.1.1"

@@ -6,13 +6,18 @@ extern crate glutin;
 extern crate image;
 
 #[macro_use]
+extern crate downcast_rs;
+use downcast_rs::Downcast;
+
+#[macro_use]
 mod gui;
 mod tools;
 
-use std::time::Instant;
 use gl::types::*;
-use tools::*;
+use std::any::Any;
+use std::time::Instant;
 use tools::camera::Camera;
+use tools::*;
 
 use std::os::raw::c_char;
 extern "C" {
@@ -46,30 +51,29 @@ struct DrawObject {
 
 struct DrawBuilder {
     objects: Vec<DrawObject>,
+    pub offset: Vec2,
 }
 
 impl DrawBuilder {
     pub fn new() -> DrawBuilder {
         DrawBuilder {
             objects: Vec::new(),
+            offset: Vec2::zero(),
         }
     }
-    
-    pub fn add_rectangle(&mut self, left: f32, up: f32, right: f32, down: f32, clr: Vec3) {
+    pub fn add_rectangle(&mut self, left_up: Vec2, right_down: Vec2, clr: Vec3) {
         self.objects.push(DrawObject {
             pts: vec![
-                Vec2::new(left, up),
-                Vec2::new(right, up),
-                Vec2::new(right, down),
-                
-                Vec2::new(left, up),
-                Vec2::new(right, down),
-                Vec2::new(left, down),
+                Vec2::new(left_up.x, left_up.y) + self.offset,
+                Vec2::new(right_down.x, left_up.y) + self.offset,
+                Vec2::new(right_down.x, right_down.y) + self.offset,
+                Vec2::new(left_up.x, left_up.y) + self.offset,
+                Vec2::new(right_down.x, right_down.y) + self.offset,
+                Vec2::new(left_up.x, right_down.y) + self.offset,
             ],
             clr,
         })
     }
-    
     pub fn to_render_sequence(self) -> RenderSequence {
         let pbuf = Buffer::from_vec(
             self.objects
@@ -78,7 +82,6 @@ impl DrawBuilder {
                 .flatten()
                 .collect(),
         );
-        
         let cbuf = Buffer::from_vec(
             self.objects
                 .iter()
@@ -86,20 +89,16 @@ impl DrawBuilder {
                 .flatten()
                 .collect(),
         );
-        
         let n = pbuf.len();
-        
         let mut vao = VertexArray::new();
         vao.attrib_buffer(0, &pbuf);
         vao.attrib_buffer(1, &cbuf);
-        
         let cmd = RenderCommand {
             vao,
             mode: DrawMode::Triangles,
             first: 0,
-            count: n
+            count: n,
         };
-        
         let mut shader = DrawShader::compile(
             "#version 420 core
             
@@ -125,14 +124,15 @@ impl DrawBuilder {
             void main()
             {
                 color = vec4(va_clr, 1);
-            }").unwrap();
-            
-            shader.set_uniform("proj", Mat4::ortho(0.0,768.0,1024.0,0.0,1.0,-1.0));
-        
+            }",
+        )
+        .unwrap();
+
+        shader.set_uniform("proj", Mat4::ortho(0.0, 768.0, 1024.0, 0.0, 1.0, -1.0));
         RenderSequence {
             buffers: vec![pbuf.as_base_type(), cbuf.as_base_type()],
             commands: vec![cmd],
-            shader
+            shader,
         }
     }
 }
@@ -163,90 +163,123 @@ impl RenderCommand {
         self.vao.bind();
         shader.prepare_draw();
         unsafe {
-            gl::DrawArrays(
-                self.mode.into(),
-                self.first as GLint,
-                self.count as GLsizei
-            );
+            gl::DrawArrays(self.mode.into(), self.first as GLint, self.count as GLsizei);
         }
     }
 }
 
-trait Widget {
-    fn on_draw_build(&self, _h:f32, _builder: &mut DrawBuilder) {}
-    
-    fn size(&self) -> Vec2;
+#[derive(Copy, Clone)]
+enum WidgetSize {
+    Pixels(Vec2),
+    Relative(Vec2),
+    Units(Vec2px),
 }
 
-struct GuiContext {
-    draw_builder: DrawBuilder,
-    hstack: Vec<f32>
+#[derive(Copy, Clone)]
+struct WidgetProperties {
+    size: WidgetSize,
 }
 
-impl GuiContext {
-    pub fn new() -> GuiContext {
-        GuiContext {
-            draw_builder: DrawBuilder::new(),
-            hstack: vec![0.0]
+#[derive(Copy, Clone)]
+struct WidgetConstraints {
+    max_size: Vec2px,
+}
+
+#[derive(Copy, Clone)]
+struct WidgetChildProps {
+    pos: Vec2px,
+    next_constraints: Option<WidgetConstraints>,
+}
+
+trait Widget : Downcast {
+    fn init_child_constraint(&mut self, self_constraint: WidgetConstraints) -> WidgetConstraints {
+        self_constraint
+    }
+
+    fn adopt_child(&mut self, _child_size: Vec2px) -> WidgetChildProps {
+        WidgetChildProps {
+            pos: Vec2px::zero(),
+            next_constraints: None,
         }
     }
-    
-    fn parse_start<T>(&mut self, w: &T) -> bool
-    where
-        T: Widget,
-    {
-        let h = *self.hstack.last().unwrap();
-        self.hstack.push(h);
-        
-        w.on_draw_build(h, &mut self.draw_builder);
-        true
+    fn start_layout(&mut self) {}
+    fn on_draw_build(&self, _builder: &mut DrawBuilder) {}
+    fn size(&self) -> Vec2px;
+}
+impl_downcast!(Widget);
+
+////////////////////////////// Vertical layout //////////////////////////////
+struct VertLayout {
+    title: String,
+    size: Vec2px,
+    useless: u32,
+    stuff: Vec2,
+}
+
+impl Widget for VertLayout {
+    fn start_layout(&mut self) {
+        self.size = Vec2px::zero()
     }
-    fn parse_end<T>(&mut self, w: &T)
-    where
-        T: Widget,
-    {
-        self.hstack.pop();
-        
-        let h = self.hstack.pop().unwrap() + w.size().y + 10.0;
-        
-        self.hstack.push(h);
+    fn init_child_constraint(&mut self, self_constraint: WidgetConstraints) -> WidgetConstraints {
+        self.size.x = self_constraint.max_size.x;
+        WidgetConstraints {
+            max_size: Vec2px::new(self_constraint.max_size.x, std::f32::INFINITY),
+        }
+    }
+
+    fn adopt_child(&mut self, child_size: Vec2px) -> WidgetChildProps {
+        let y = self.size.y;
+        self.size.y += child_size.y;
+        WidgetChildProps {
+            pos: Vec2px::new(0.0, y),
+            next_constraints: None,
+        }
+    }
+
+    fn size(&self) -> Vec2px {
+        self.size
     }
 }
 
-struct Layout {
-    height: usize,
-}
-
-impl Widget for Layout {
-    fn on_draw_build(&self, h:f32, builder: &mut DrawBuilder) {
-        builder.add_rectangle(0.0, h, 100.0, h + self.height as f32, Vec3::new(0.1,0.1,0.1));
-    }
-    
-    fn size(&self) -> Vec2 {
-        Vec2::new(0.0, self.height as f32)
-    }
-}
-
+////////////////////////////// Button //////////////////////////////
 struct Button {
     text: String,
 }
 
 impl Widget for Button {
-    fn on_draw_build(&self, h:f32, builder: &mut DrawBuilder) {
-        println!("A button with text \"{}\" is created at height {}", self.text, h);
-        
-        builder.add_rectangle(0.0, h, 50.0, h + 50.0, Vec3::new(0.8,0.1,0.1));
+    fn size(&self) -> Vec2px {
+        Vec2px::new(100.0, 100.0)
     }
-    
-    fn size(&self) -> Vec2 {
-        Vec2::new(50.0, 50.0)
+    fn on_draw_build(&self, builder: &mut DrawBuilder) {
+        builder.add_rectangle(
+            Vec2::zero(),
+            self.size().to_pixels(1.0),
+            Vec3::new(1.0, 0.0, 0.0),
+        );
     }
 }
 
+trait WidgetTreeParser {
+    fn parse_push<T>(&mut self, w: T) -> bool
+    where
+        T: Widget + 'static;
+    
+    
+    fn parse_pop<T>(&mut self)
+    where
+        T: Widget + 'static;
+}
+
 #[glui::builder]
-fn tagged_function(context: &mut GuiContext, data: i32) {
-    Layout {
-        height: 400,
+fn tagged_function<P>(parser: &mut P, data: i32) 
+where
+    P: WidgetTreeParser
+{
+    VertLayout {
+        title: "".to_owned(),
+        size: Vec2px::zero(),
+        useless: 0,
+        stuff: Vec2::zero(),
         children: {
             for i in 1..6 {
                 Button {
@@ -255,8 +288,11 @@ fn tagged_function(context: &mut GuiContext, data: i32) {
             }
         },
     };
-    Layout {
-        height: 400,
+    VertLayout {
+        useless: 0,
+        size: Vec2px::zero(),
+        title: "".to_owned(),
+        stuff: Vec2::zero(),
         children: {
             Button {
                 text: format!("A_{}", data),
@@ -268,68 +304,163 @@ fn tagged_function(context: &mut GuiContext, data: i32) {
     };
 }
 
-fn main() {
-    let event_loop = glutin::event_loop::EventLoop::new();
-    let window_builder = glutin::window::WindowBuilder::new()
-        .with_title("Hello world!")
-        .with_inner_size(glutin::dpi::LogicalSize::new(1024.0, 768.0));
-    let gl_window = glutin::ContextBuilder::new()
-        .with_vsync(true)
-        .build_windowed(window_builder, &event_loop)
-        .unwrap();
+struct WidgetCollector {
+    widgets: Vec<Box<dyn Widget>>,
+    postorder: Vec<usize>,
+    child_count: Vec<usize>,
+    
+    id_stack: Vec<usize>,
+}
 
-    gl_window
-        .window()
-        .set_cursor_icon(glutin::window::CursorIcon::Default);
+impl WidgetCollector {
+    pub fn new() -> Self {
+        Self {
+            widgets: vec![],
+            postorder: vec![],
+            child_count: vec![],
+            id_stack: vec![]
+        }
+    }
+}
+
+impl WidgetTreeParser for WidgetCollector {
+    fn parse_push<T>(&mut self, w: T) -> bool
+    where
+        T: Widget + 'static,
+    {
+        match self.id_stack.last() {
+            None => (),
+            Some(&parid) => {
+                self.child_count[parid] += 1;
+            }
+        }
         
+        let id = self.widgets.len();
+        self.id_stack.push(id);
         
-    let gl_window = unsafe { gl_window.make_current().unwrap() };
-    unsafe {
-        gl::load_with(|symbol| gl_window.get_proc_address(symbol) as *const _);
-        let s = gl::GetString(gl::VERSION);
-        puts(s as *const i8);
-        // gl::Enable(gl::DEPTH_TEST);
-        // gl::DepthFunc(gl::LEQUAL);
+        self.widgets.push(Box::new(w));
+        self.child_count.push(0);
+        
+        true
     }
     
-    let mut cont = GuiContext::new();
     
-    tagged_function(&mut cont, 42);
-    
-    let seq = cont.draw_builder.to_render_sequence();
-    
-    event_loop.run(move |event, _, control_flow| {
-        *control_flow = glutin::event_loop::ControlFlow::Wait;
+    fn parse_pop<T>(&mut self)
+    where
+        T: Widget + 'static,
+    {
+        let id = self.id_stack.pop().unwrap();
+        self.postorder.push(id);
+    }
+}
 
-        match event {
-            glutin::event::Event::WindowEvent { event, .. } => match event {
-                glutin::event::WindowEvent::CloseRequested => {
-                    *control_flow = glutin::event_loop::ControlFlow::Exit;
-                }
-                glutin::event::WindowEvent::Focused(false) => {
-                    *control_flow = glutin::event_loop::ControlFlow::Exit;
-                }
-                _ => (),
-            },
-            glutin::event::Event::RedrawRequested(..) => {
-                unsafe {
-                    gl::ClearColor(0.5,0.5,0.5, 1.0);
-                    gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
-                }
-                seq.execute();
-                gl_window.swap_buffers().unwrap();
-            }
-            glutin::event::Event::MainEventsCleared => {
-                gl_window.window().request_redraw();
-            }
-            _ => (),
-        }
-    });
+fn main() {
+    let mut parser = WidgetCollector::new();
+    tagged_function(&mut parser, 42);
+    
+    println!("Postorder: {:?}", parser.postorder);
+    println!("Child_count: {:?}", parser.child_count);
+    
 }
 
 
+// ////////////////////////////// GuiContext //////////////////////////////
+// struct GuiContext {
+//     draw_builder: DrawBuilder,
+//     canvas_size: Vec2px,
+// }
 
+// impl GuiContext {
+//     pub fn new(canvas_size: Vec2px) -> GuiContext {
+//         GuiContext {
+//             draw_builder: DrawBuilder::new(),
+//             canvas_size
+//         }
+//     }
+    
+//     fn parse_push<T>(&mut self, w: T) -> bool
+//     where
+//         T: Widget + 'static,
+//     {
+//         self.add_constraint(Some(w.init_child_constraint(self.last_constraint())));
+//         self.widgets.push(Box::new(w));
+//         true
+//     }
+    
+//     fn parse_pop<T>(&mut self)
+//     where
+//         T: Widget + 'static,
+//     {
+//         self.constraint_stack.pop().unwrap();
+        
+//         let mut w = self.pop_last_widget::<T>();
+//         if !self.top_level_widget() {
+//             let parent = self.access_last_widget();
+            
+//             let child_props = parent.adopt_child(w.size());
+            
+//             self.rel_poses.push(child_props.pos);
+            
+//             self.constraint_stack.pop().unwrap();
+//             self.add_constraint(child_props.next_constraints);
+//         }
+//     }
+// }
 
+// fn main() {
+//     let event_loop = glutin::event_loop::EventLoop::new();
+//     let window_builder = glutin::window::WindowBuilder::new()
+//         .with_title("Hello world!")
+//         .with_inner_size(glutin::dpi::LogicalSize::new(1024.0, 768.0));
+//     let gl_window = glutin::ContextBuilder::new()
+//         .with_vsync(true)
+//         .build_windowed(window_builder, &event_loop)
+//         .unwrap();
+
+//     gl_window
+//         .window()
+//         .set_cursor_icon(glutin::window::CursorIcon::Default);
+//     let gl_window = unsafe { gl_window.make_current().unwrap() };
+//     unsafe {
+//         gl::load_with(|symbol| gl_window.get_proc_address(symbol) as *const _);
+//         let s = gl::GetString(gl::VERSION);
+//         puts(s as *const i8);
+//         // gl::Enable(gl::DEPTH_TEST);
+//         // gl::DepthFunc(gl::LEQUAL);
+//     }
+    
+//     let mut cont = GuiContext::new();
+//     tagged_function(&mut cont, 42);
+//     let seq = cont.draw_builder.to_render_sequence();
+    
+//     event_loop.run(move |event, _, control_flow| {
+//         *control_flow = glutin::event_loop::ControlFlow::Wait;
+
+//         match event {
+//             glutin::event::Event::WindowEvent { event, .. } => match event {
+//                 glutin::event::WindowEvent::CloseRequested => {
+//                     *control_flow = glutin::event_loop::ControlFlow::Exit;
+//                 }
+//                 glutin::event::WindowEvent::Focused(false) => {
+//                     *control_flow = glutin::event_loop::ControlFlow::Exit;
+//                 }
+//                 _ => (),
+//             },
+//             glutin::event::Event::RedrawRequested(..) => {
+//                 unsafe {
+//                     gl::ClearColor(0.5, 0.5, 0.5, 1.0);
+//                     gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+//                 }
+//                 seq.execute();
+//                 gl_window.swap_buffers().unwrap();
+//             }
+//             glutin::event::Event::MainEventsCleared => {
+//                 gl_window.window().request_redraw();
+//             }
+//             _ => (),
+//         }
+//     });
+// }
 
 // fn main() {
 //     let pi = std::f32::consts::PI;
