@@ -3,7 +3,7 @@ extern crate num;
 use std::ops::{Add,Sub,Mul,Div,AddAssign,SubAssign,MulAssign,DivAssign};
 use super::vector3::Vec3;
 
-#[derive(Copy,Clone,Debug)]
+#[derive(Copy,Clone,Debug,PartialEq)]
 pub struct Vec4 {
     pub x: f32,
     pub y: f32,

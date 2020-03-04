@@ -3,7 +3,7 @@ extern crate num;
 use std::ops::{Add,Sub,Mul,Div,AddAssign,SubAssign,MulAssign,DivAssign,Neg};
 use super::vector2::Vec2;
 
-#[derive(Copy,Clone,Debug)]
+#[derive(Copy,Clone,Debug,PartialEq)]
 pub struct Vec3 {
     pub x: f32,
     pub y: f32,
@@ -17,6 +17,10 @@ impl Vec3 {
     
     pub fn new(x: f32, y: f32, z: f32) -> Vec3 {
         Vec3{x:x,y:y,z:z}
+    }
+    
+    pub fn grey(xyz: f32) -> Vec3 {
+        Vec3{x:xyz,y:xyz,z:xyz}
     }
     
     pub fn from_vec2(xy: Vec2, z: f32) -> Vec3 {

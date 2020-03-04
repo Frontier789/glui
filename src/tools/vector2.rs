@@ -2,7 +2,7 @@ extern crate num;
 
 use std::ops::{Add,Sub,Mul,Div,AddAssign,SubAssign,MulAssign,DivAssign,Neg};
 
-#[derive(Copy,Clone,Debug)]
+#[derive(Copy,Clone,Debug,Default,PartialEq)]
 pub struct Vec2 {
     pub x: f32,
     pub y: f32

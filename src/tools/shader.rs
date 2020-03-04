@@ -208,8 +208,7 @@ impl DrawShader {
         let loc: GLint = unsafe { gl::GetUniformLocation(self.id(), name_ptr as *const i8) };
         
         if loc > -1 {
-            self.bind();
-            T::set_uniform_impl(val, loc, &mut self.tex_uniforms);
+            T::set_uniform_impl(val, self.id, loc, &mut self.tex_uniforms);
         }
     }
 }

@@ -2,7 +2,7 @@ extern crate num;
 
 use std::ops::{Add,Sub,Mul,Div,AddAssign,SubAssign,MulAssign,DivAssign,Neg};
 
-#[derive(Copy,Clone,Debug)]
+#[derive(Copy,Clone,Debug,Default,PartialEq)]
 pub struct Vec2px {
     pub x: f32,
     pub y: f32
@@ -228,6 +228,9 @@ impl Neg for Vec2px {
         )
     }
 }
+
+
+/////////// vec2 - vec2px conversion ///////////
 
 use super::vector2::Vec2;
 impl Vec2px {
