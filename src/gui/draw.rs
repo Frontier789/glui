@@ -1,13 +1,13 @@
-use tools::*;
 use gl::types::*;
+use tools::*;
 
-#[derive(Debug,Default,Copy,Clone,PartialEq,Eq)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
 pub struct GLVerion {
     major: usize,
     minor: usize,
 }
 
-#[derive(Debug,Default,Copy,Clone,PartialEq)]
+#[derive(Debug, Default, Copy, Clone, PartialEq)]
 pub struct RenderTarget {
     pub size: Vec2,
     pub gui_scale: f32,
@@ -18,16 +18,18 @@ impl RenderTarget {
     pub fn logical_size(&self) -> Vec2px {
         Vec2px::from_pixels(self.size, self.gui_scale)
     }
-    
     pub fn fill_from_context(mut self) -> Self {
         let mut major: GLint = 0;
         let mut minor: GLint = 0;
         unsafe {
-            gl::GetIntegerv(gl::MAJOR_VERSION,&mut major);
-            gl::GetIntegerv(gl::MINOR_VERSION,&mut minor);
+            gl::GetIntegerv(gl::MAJOR_VERSION, &mut major);
+            gl::GetIntegerv(gl::MINOR_VERSION, &mut minor);
         }
-        
-        self.gl_verison = GLVerion{major: major as usize, minor: minor as usize};
+
+        self.gl_verison = GLVerion {
+            major: major as usize,
+            minor: minor as usize,
+        };
         self
     }
 }
@@ -59,7 +61,6 @@ impl DrawBuilder {
             offset: Vec2::zero(),
         }
     }
-    
     pub fn add_rectangle(&mut self, left_up: Vec2, right_down: Vec2, clr: Vec3) {
         self.objects.push(DrawObject {
             pts: vec![
@@ -73,35 +74,43 @@ impl DrawBuilder {
             clr,
         })
     }
-    
-    pub fn to_render_sequence(self, render_target: &RenderTarget) -> RenderSequence {
-        let pbuf = Buffer::<Vec2>::from_vec(
-            self.objects
-                .iter()
-                .map(|o| o.pts.clone())
-                .flatten()
-                .map(|p| p * render_target.gui_scale)
-                .collect(),
-        );
-        let cbuf = Buffer::from_vec(
-            self.objects
-                .iter()
-                .map(|o| vec![o.clr; 6])
-                .flatten()
-                .collect(),
-        );
-        let n = pbuf.len();
-        let mut vao = VertexArray::new();
-        vao.attrib_buffer(0, &pbuf);
-        vao.attrib_buffer(1, &cbuf);
-        let cmd = RenderCommand {
-            vao,
-            mode: DrawMode::Triangles,
-            first: 0,
-            count: n,
-        };
-        let mut shader = DrawShader::compile(
-            "#version 420 core
+
+    pub fn to_render_sequence(
+        self,
+        render_target: &RenderTarget,
+        cache: Option<RenderSequence>,
+    ) -> RenderSequence {
+        let pts: Vec<Vec2> = self
+            .objects
+            .iter()
+            .map(|o| o.pts.clone())
+            .flatten()
+            .map(|p| p * render_target.gui_scale)
+            .collect();
+        let clr = self
+            .objects
+            .iter()
+            .map(|o| vec![o.clr; 6])
+            .flatten()
+            .collect();
+        let n = pts.len();
+        
+        match cache {
+            None => {
+                let pbuf = Buffer::from_vec(pts);
+                let cbuf = Buffer::from_vec(clr);
+                let mut vao = VertexArray::new();
+                vao.attrib_buffer(0, &pbuf);
+                vao.attrib_buffer(1, &cbuf);
+                let cmd = RenderCommand {
+                    vao,
+                    mode: DrawMode::Triangles,
+                    first: 0,
+                    count: n,
+                };
+
+                let mut shader = DrawShader::compile(
+                    "#version 420 core
             
             layout(location = 0) in vec2 pos;
             layout(location = 1) in vec3 clr;
@@ -116,7 +125,7 @@ impl DrawBuilder {
                 
                 va_clr = clr;
             }",
-            "#version 420 core
+                    "#version 420 core
             
             in vec3 va_clr;
             
@@ -126,14 +135,59 @@ impl DrawBuilder {
             {
                 color = vec4(va_clr, 1);
             }",
-        )
-        .unwrap();
+                )
+                .unwrap();
 
-        shader.set_uniform("proj", Mat4::ortho(0.0, 768.0, 1024.0, 0.0, 1.0, -1.0));
-        RenderSequence {
-            buffers: vec![pbuf.as_base_type(), cbuf.as_base_type()],
-            commands: vec![cmd],
-            shader,
+                shader.set_uniform(
+                    "proj",
+                    Mat4::ortho(
+                        0.0,
+                        render_target.size.y,
+                        render_target.size.x,
+                        0.0,
+                        1.0,
+                        -1.0,
+                    ),
+                );
+                RenderSequence {
+                    buffers: vec![pbuf.as_base_type(), cbuf.as_base_type()],
+                    commands: vec![cmd],
+                    shader,
+                }
+            }
+            Some(rs) => {
+                
+                let pbuf = Buffer::from_vec(pts);
+                let cbuf = Buffer::from_vec(clr);
+                let mut vao = VertexArray::new();
+                vao.attrib_buffer(0, &pbuf);
+                vao.attrib_buffer(1, &cbuf);
+                let cmd = RenderCommand {
+                    vao,
+                    mode: DrawMode::Triangles,
+                    first: 0,
+                    count: n,
+                };
+
+                let mut shader = rs.shader;
+
+                shader.set_uniform(
+                    "proj",
+                    Mat4::ortho(
+                        0.0,
+                        render_target.size.y,
+                        render_target.size.x,
+                        0.0,
+                        1.0,
+                        -1.0,
+                    ),
+                );
+                RenderSequence {
+                    buffers: vec![pbuf.as_base_type(), cbuf.as_base_type()],
+                    commands: vec![cmd],
+                    shader,
+                }
+            }
         }
     }
 }

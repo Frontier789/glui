@@ -3,7 +3,8 @@ macro_rules! register_gui_element_struct_init {
     // base case
     ( $class:ident { $( $field_in:ident : $value_in:expr ,)* } @ ) => {
         $class {
-            $( $field_in : $value_in ),*
+            $( $field_in : $value_in ,)*
+            ..Default::default()
         }
     };
     

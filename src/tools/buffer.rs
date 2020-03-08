@@ -21,19 +21,16 @@ impl<T: GlNum> Buffer<T> {
             _data_type: PhantomData,
         }
     }
-    
     pub fn from_vec(v: Vec<T>) -> Buffer<T> {
         let mut buf = Buffer::<T>::new();
         buf.set_data_reinterpret(v);
         buf
     }
-    
     pub fn from_base_vec(v: Vec<T::BaseType>) -> Buffer<T> {
         let mut buf = Buffer::<T>::new();
         buf.set_data_reinterpret(v);
         buf
     }
-    
     pub fn len(&self) -> usize {
         self.size
     }
@@ -66,7 +63,6 @@ impl<T: GlNum> Buffer<T> {
             gl::NamedBufferSubData(self.id, offs as GLintptr, size as GLsizeiptr, ptr);
         }
     }
-    
     pub fn data(&self) -> Vec<T> {
         let mut v = Vec::<T>::with_capacity(self.size);
         unsafe {
@@ -79,7 +75,6 @@ impl<T: GlNum> Buffer<T> {
         std::mem::forget(v);
         unsafe { Vec::from_raw_parts(ptr, cap, cap) }
     }
-    
     pub fn bind(&self) {
         unsafe { gl::BindBuffer(gl::ARRAY_BUFFER, self.id) };
     }
@@ -90,10 +85,22 @@ impl<T: GlNum> Buffer<T> {
     {
         let id = self.id;
         self.id = 0;
-        
         Buffer {
             id,
             size: self.size * T::dim() as usize,
+            _data_type: PhantomData,
+        }
+    }
+
+    pub fn as_type<U>(mut self) -> Buffer<U>
+    where
+        U: GlNum<BaseType = T>,
+    {
+        let id = self.id;
+        self.id = 0;
+        Buffer {
+            id,
+            size: self.size / U::dim() as usize,
             _data_type: PhantomData,
         }
     }

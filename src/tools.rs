@@ -12,6 +12,7 @@ pub mod vector2;
 pub mod vector2px;
 pub mod vector3;
 pub mod vector4;
+pub mod rect;
 
 pub use self::buffer::Buffer;
 pub use self::camera::Camera3D;
@@ -28,3 +29,4 @@ pub use self::vector2::Vec2;
 pub use self::vector2px::Vec2px;
 pub use self::vector3::Vec3;
 pub use self::vector4::Vec4;
+pub use self::rect::Rect;
