@@ -1,5 +1,6 @@
 pub use super::tools::*;
 pub use super::gui::RenderTarget;
+pub use super::gui::GlutinEvent;
 
 impl From<glutin::dpi::PhysicalSize<u32>> for Vec2 {
     fn from(s: glutin::dpi::PhysicalSize<u32>) -> Vec2 {
@@ -19,13 +20,6 @@ impl From<glutin::dpi::PhysicalPosition<i32>> for Vec2 {
     }
 }
 
-pub type GlutinGLWindow = glutin::ContextWrapper<glutin::PossiblyCurrent, glutin::window::Window>;
-pub type GlutinGLWindowNC = glutin::ContextWrapper<glutin::NotCurrent, glutin::window::Window>;
-pub type GlutinEventLoop = glutin::event_loop::EventLoop<()>;
-pub type GlutinKey = glutin::event::VirtualKeyCode;
-pub type GlutinButton = glutin::event::MouseButton;
-pub type GlutinEvent<'a> = glutin::event::WindowEvent<'a>;
-
 // TODO: move methods to componenets
 pub trait Entity {
     fn handle_event(&mut self, e: &GlutinEvent);
@@ -38,13 +32,13 @@ pub struct World {
 }
 
 impl World {
-    fn handle_event(&mut self, ev: GlutinEvent) {
+    pub fn handle_event(&mut self, ev: GlutinEvent) {
         for e in self.entities.iter_mut() {
             e.handle_event(&ev);
         }
     }
     
-    fn render(&self) {
+    pub fn render(&self) {
         for e in self.entities.iter() {
             e.render();
         }
@@ -52,149 +46,5 @@ impl World {
     
     pub fn add_entity(&mut self, entity: Box<dyn Entity>) {
         self.entities.push(entity);
-    }
-}
-
-pub struct GuiWinProps {
-    quit_on_esc: bool,
-    quit_on_focus_lost: bool,
-}
-
-impl GuiWinProps {
-    pub fn quick_tester() -> GuiWinProps {
-        GuiWinProps {
-            quit_on_esc: true,
-            quit_on_focus_lost: true,
-        }
-    }
-    
-    pub fn tester() -> GuiWinProps {
-        GuiWinProps {
-            quit_on_esc: true,
-            quit_on_focus_lost: false,
-        }
-    }
-}
-
-pub struct ECSWindow {
-    event_loop: glutin::event_loop::EventLoop<()>,
-    gl_window: GlutinGLWindow,
-    bgcolor: Vec3,
-    pub world: World,
-}
-
-impl ECSWindow {
-    fn prepare_gl(gl_window: GlutinGLWindowNC, bgcolor: Vec3) -> GlutinGLWindow {
-        gl_window
-            .window()
-            .set_cursor_icon(glutin::window::CursorIcon::Default);
-        
-        let gl_window = unsafe { gl_window.make_current().unwrap() };
-        
-        unsafe {
-            gl::load_with(|symbol| gl_window.get_proc_address(symbol) as *const _);
-            
-            gl::ClearColor(bgcolor.x, bgcolor.y, bgcolor.z, 1.0);
-            gl::Clear(gl::COLOR_BUFFER_BIT);
-        }
-        
-        gl_window
-    }
-    
-    pub fn create_window(size: Vec2, title: String, event_loop: &GlutinEventLoop) -> GlutinGLWindowNC {
-        let window_builder = glutin::window::WindowBuilder::new()
-            .with_title(title)
-            .with_inner_size(glutin::dpi::LogicalSize::new(size.x, size.y))
-            .with_visible(false);
-        glutin::ContextBuilder::new()
-            .with_vsync(true)
-            .build_windowed(window_builder, &event_loop)
-            .unwrap()
-    }
-    
-    pub fn new(size: Vec2, title: String, bgcolor: Vec3) -> Self {
-        let event_loop = glutin::event_loop::EventLoop::new();
-        
-        let gl_window = Self::prepare_gl(Self::create_window(size, title, &event_loop), bgcolor);
-        
-        gl_window.window().set_visible(true);
-        
-        ECSWindow {
-            event_loop,
-            gl_window,
-            bgcolor,
-            world: World {
-                entities: vec![]
-            },
-        }
-    }
-    
-    pub fn render_target(&self) -> RenderTarget {
-        let win = self.gl_window.window();
-        
-        RenderTarget {
-            size: win.inner_size().into(),
-            gui_scale: win.scale_factor() as f32,
-            ..Default::default()
-        }
-        .fill_from_context()
-    }
-
-    pub fn run(self, props: GuiWinProps)
-    {
-        let event_loop = self.event_loop;
-        let gl_window = self.gl_window;
-        let bgcolor = self.bgcolor;
-        let mut world = self.world;
-        
-        event_loop.run(move |event, _, control_flow| {
-            *control_flow = glutin::event_loop::ControlFlow::Wait;
-    
-            match event {
-                glutin::event::Event::WindowEvent { event, .. } => {
-                    match event {
-                        glutin::event::WindowEvent::CloseRequested => {
-                            *control_flow = glutin::event_loop::ControlFlow::Exit;
-                        }
-                        glutin::event::WindowEvent::Focused(false) => {
-                            if props.quit_on_focus_lost {
-                                *control_flow = glutin::event_loop::ControlFlow::Exit;
-                            }
-                        },
-                        glutin::event::WindowEvent::KeyboardInput { input, .. } => {
-                            match input.virtual_keycode {
-                                None => (),
-                                Some(glutin::event::VirtualKeyCode::Escape) => if props.quit_on_esc {
-                                    *control_flow = glutin::event_loop::ControlFlow::Exit;
-                                },
-                                _ => {},
-                            }
-                        },
-                        glutin::event::WindowEvent::Resized(size) => {
-                            unsafe {
-                                gl::Viewport(0, 0, size.width as i32, size.height as i32);
-                            }
-                        },
-                        _ => (),
-                    }
-                    
-                    world.handle_event(event);
-                },
-                glutin::event::Event::RedrawRequested(..) => {
-                    unsafe {
-                        gl::ClearColor(bgcolor.x, bgcolor.y, bgcolor.z, 1.0);
-                        gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
-                    }
-                    
-                    world.render();
-                    
-                    gl_window.swap_buffers().unwrap();
-                }
-                glutin::event::Event::RedrawEventsCleared => {
-                    gl_window.window().request_redraw();
-                }
-                _ => (),
-            }
-        });
     }
 }
