@@ -24,7 +24,7 @@ impl From<glutin::dpi::PhysicalPosition<i32>> for Vec2 {
 pub trait Entity {
     fn handle_event(&mut self, e: &GlutinEvent);
     
-    fn render(&self);
+    fn render(&mut self);
 }
 
 pub struct World {
@@ -38,8 +38,8 @@ impl World {
         }
     }
     
-    pub fn render(&self) {
-        for e in self.entities.iter() {
+    pub fn render(&mut self) {
+        for e in self.entities.iter_mut() {
             e.render();
         }
     }

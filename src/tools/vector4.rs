@@ -31,6 +31,9 @@ impl Vec4 {
     pub fn dot(&self, v: Vec4) -> f32 {
         self.x * v.x + self.y * v.y + self.z * v.z
     }
+    
+    pub const WHITE : Vec4 = Vec4 {x:1.0,y:1.0,z:1.0,w:1.0};
+    pub const BLACK : Vec4 = Vec4 {x:0.0,y:0.0,z:0.0,w:1.0};
 }
 
 // A op B

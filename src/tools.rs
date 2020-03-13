@@ -24,6 +24,7 @@ pub use self::mesh::parsurf;
 pub use self::shader::DrawShader;
 pub use self::shadererr::ShaderCompileErr;
 pub use self::tex2d::Texture;
+pub use self::tex2d::RgbaTexture;
 pub use self::vao::VertexArray;
 pub use self::vector2::Vec2;
 pub use self::vector2px::Vec2px;

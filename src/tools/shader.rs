@@ -164,7 +164,7 @@ use gl::types::*;
 pub struct DrawShader {
     id: u32,
     sids: Vec<u32>,
-    tex_uniforms: HashMap<GLint, (u32, u32)>,
+    tex_uniforms: HashMap<GLint, u32>,
 }
 
 impl DrawShader {
@@ -178,16 +178,6 @@ impl DrawShader {
             sids: sids,
             tex_uniforms: HashMap::new(),
         })
-    }
-    
-    pub fn prepare_draw(&self) {
-        self.bind();
-        for (_loc, (slot, id)) in &self.tex_uniforms {
-            unsafe {
-                gl::ActiveTexture(gl::TEXTURE0 + slot);
-                gl::BindTexture(gl::TEXTURE_2D, *id);
-            }
-        }
     }
     
     pub fn id(&self) -> GLuint {

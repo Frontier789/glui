@@ -92,64 +92,106 @@ impl GlNum for Mat4 {
 
 /// Types that can be set as uniforms
 pub trait GlUniform {
-    fn set_uniform_impl(val: Self, prog: GLuint, loc: GLint, map: &mut HashMap<GLint, (u32, u32)>);
+    fn set_uniform_impl(val: Self, prog: GLuint, loc: GLint, map: &mut HashMap<GLint, u32>);
 }
 
 impl GlUniform for f32 {
-    fn set_uniform_impl(val: Self, prog: GLuint, loc: GLint, _map: &mut HashMap<GLint, (u32, u32)>) {
+    fn set_uniform_impl(
+        val: Self,
+        prog: GLuint,
+        loc: GLint,
+        _map: &mut HashMap<GLint, u32>,
+    ) {
         unsafe {
             gl::ProgramUniform1f(prog, loc, val);
         }
     }
 }
+
 impl GlUniform for i32 {
-    fn set_uniform_impl(val: Self, prog: GLuint, loc: GLint, _map: &mut HashMap<GLint, (u32, u32)>) {
+    fn set_uniform_impl(
+        val: Self,
+        prog: GLuint,
+        loc: GLint,
+        _map: &mut HashMap<GLint, u32>,
+    ) {
         unsafe {
             gl::ProgramUniform1i(prog, loc, val);
         }
     }
 }
+
 impl GlUniform for Vec2 {
-    fn set_uniform_impl(val: Self, prog: GLuint, loc: GLint, _map: &mut HashMap<GLint, (u32, u32)>) {
+    fn set_uniform_impl(
+        val: Self,
+        prog: GLuint,
+        loc: GLint,
+        _map: &mut HashMap<GLint, u32>,
+    ) {
         unsafe {
             gl::ProgramUniform2f(prog, loc, val.x, val.y);
         }
     }
 }
+
 impl GlUniform for Vec3 {
-    fn set_uniform_impl(val: Self, prog: GLuint, loc: GLint, _map: &mut HashMap<GLint, (u32, u32)>) {
+    fn set_uniform_impl(
+        val: Self,
+        prog: GLuint,
+        loc: GLint,
+        _map: &mut HashMap<GLint, u32>,
+    ) {
         unsafe {
             gl::ProgramUniform3f(prog, loc, val.x, val.y, val.z);
         }
     }
 }
+
 impl GlUniform for Vec4 {
-    fn set_uniform_impl(val: Self, prog: GLuint, loc: GLint, _map: &mut HashMap<GLint, (u32, u32)>) {
+    fn set_uniform_impl(
+        val: Self,
+        prog: GLuint,
+        loc: GLint,
+        _map: &mut HashMap<GLint, u32>,
+    ) {
         unsafe {
             gl::ProgramUniform4f(prog, loc, val.x, val.y, val.z, val.w);
         }
     }
 }
+
 impl GlUniform for Mat4 {
-    fn set_uniform_impl(val: Self, prog: GLuint, loc: GLint, _map: &mut HashMap<GLint, (u32, u32)>) {
+    fn set_uniform_impl(
+        val: Self,
+        prog: GLuint,
+        loc: GLint,
+        _map: &mut HashMap<GLint, u32>,
+    ) {
         unsafe {
             gl::ProgramUniformMatrix4fv(prog, loc, 1, gl::FALSE, val.as_ptr());
         }
     }
 }
-impl GlUniform for &Texture {
-    fn set_uniform_impl(val: Self, prog: GLuint, loc: GLint, map: &mut HashMap<GLint, (u32, u32)>) {
-        let id = val.get_id();
-        if map.contains_key(&loc) {
-            let slot = map.get(&loc).unwrap().0;
-            map.insert(loc, (slot, id));
-        } else {
+
+impl<T> GlUniform for &T
+where
+    T: Texture,
+{
+    fn set_uniform_impl(val: Self, prog: GLuint, loc: GLint, map: &mut HashMap<GLint, u32>) {
+        if !map.contains_key(&loc) {
             let slot = map.len() as u32;
 
             unsafe {
                 gl::ProgramUniform1i(prog, loc, slot as GLint);
             }
-            map.insert(loc, (slot, id));
+            map.insert(loc, slot);
+        }
+        
+        let slot = map[&loc];
+        
+        unsafe {
+            gl::ActiveTexture(gl::TEXTURE0 + slot);
+            val.bind();
         }
     }
 }

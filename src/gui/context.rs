@@ -11,6 +11,7 @@ enum GrabState {
 
 pub struct GuiContext {
     render_target: RenderTarget,
+    draw_res: DrawResources,
     widgets: Vec<Box<dyn Widget + 'static>>,
     positions: Vec<Vec2px>,
     
@@ -68,8 +69,10 @@ impl Entity for GuiContext {
         }
     }
     
-    fn render(&self) {
-        self.render_seq.as_ref().unwrap().execute();
+    fn render(&mut self) {
+        let rseq = self.render_seq.as_ref().unwrap();
+        rseq.update_resources(&mut self.draw_res);
+        rseq.execute(&mut self.draw_res);
     }
 }
 
@@ -85,17 +88,20 @@ impl GuiContext {
             recheck_cursor: true,
             render_seq: None,
             render_dirty: true,
+            draw_res: DrawResources::new(),
         }
+    }
+    
+    pub fn init_gl_res(&mut self) {
+        self.draw_res.create_defaults().unwrap();
     }
     
     fn rebuild_render_seq(&mut self) {
         let mut drawer = WidgetDrawBuilder::new();
         
         drawer.build(&self.widgets, &self.positions);
-        
-        let rs = self.render_seq.take();
-        
-        self.render_seq = Some(drawer.builder.to_render_sequence(&self.render_target,rs));
+                
+        self.render_seq = Some(drawer.builder.to_render_sequence(&self.render_target));
         
         self.render_dirty = false;
     }
