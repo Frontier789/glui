@@ -50,7 +50,12 @@ impl GlutinWindow {
             
             gl::ClearColor(bgcolor.x, bgcolor.y, bgcolor.z, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT);
+            
+            gl::Enable(gl::DEPTH_TEST);
+            gl::DepthFunc(gl::LEQUAL);
         }
+        
+        gl_window.swap_buffers().unwrap();
         
         gl_window
     }

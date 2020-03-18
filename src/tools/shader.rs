@@ -201,6 +201,27 @@ impl DrawShader {
             T::set_uniform_impl(val, self.id, loc, &mut self.tex_uniforms);
         }
     }
+    
+    pub fn uniform_tex2d_id(&mut self, name: &str, id: u32) {
+        let name_ptr = std::ffi::CString::new(name).unwrap().into_raw();
+        let loc: GLint = unsafe { gl::GetUniformLocation(self.id(), name_ptr as *const i8) };
+        
+        if !self.tex_uniforms.contains_key(&loc) {
+            let slot = self.tex_uniforms.len() as u32;
+
+            unsafe {
+                gl::ProgramUniform1i(self.id(), loc, slot as GLint);
+            }
+            self.tex_uniforms.insert(loc, slot);
+        }
+        
+        let slot = self.tex_uniforms[&loc];
+        
+        unsafe {
+            gl::ActiveTexture(gl::TEXTURE0 + slot);
+            gl::BindTexture(gl::TEXTURE_2D, id);
+        }
+    }
 }
 
 impl Drop for DrawShader {

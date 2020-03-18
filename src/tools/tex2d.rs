@@ -150,18 +150,34 @@ impl RgbaTexture {
         let w = w as usize;
         let h = h as usize;
         match img {
-            image::ImageLuma8(img) => {
+            image::DynamicImage::ImageLuma8(img) => {
                 let rgb_img: image::RgbImage = img.convert();
                 Ok(RgbaTexture::from_ptr_u8(w, h, gl::RGB, rgb_img.as_ptr()))
             }
-            image::ImageLumaA8(img) => {
+            image::DynamicImage::ImageLumaA8(img) => {
                 let rgba_img: image::RgbaImage = img.convert();
                 Ok(RgbaTexture::from_ptr_u8(w, h, gl::RGBA, rgba_img.as_ptr()))
             }
-            image::ImageRgb8(img) => Ok(RgbaTexture::from_ptr_u8(w, h, gl::RGB, img.as_ptr())),
-            image::ImageRgba8(img) => Ok(RgbaTexture::from_ptr_u8(w, h, gl::RGBA, img.as_ptr())),
-            image::ImageBgr8(img) => Ok(RgbaTexture::from_ptr_u8(w, h, gl::BGR, img.as_ptr())),
-            image::ImageBgra8(img) => Ok(RgbaTexture::from_ptr_u8(w, h, gl::BGRA, img.as_ptr())),
+            image::DynamicImage::ImageRgb8(img) => Ok(RgbaTexture::from_ptr_u8(w, h, gl::RGB, img.as_ptr())),
+            image::DynamicImage::ImageRgba8(img) => Ok(RgbaTexture::from_ptr_u8(w, h, gl::RGBA, img.as_ptr())),
+            image::DynamicImage::ImageBgr8(img) => Ok(RgbaTexture::from_ptr_u8(w, h, gl::BGR, img.as_ptr())),
+            image::DynamicImage::ImageBgra8(img) => Ok(RgbaTexture::from_ptr_u8(w, h, gl::BGRA, img.as_ptr())),
+            image::DynamicImage::ImageLuma16(img) => {
+                let rgb_img: image::RgbImage = img.convert();
+                Ok(RgbaTexture::from_ptr_u8(w, h, gl::RGB, rgb_img.as_ptr()))
+            }
+            image::DynamicImage::ImageLumaA16(img) => {
+                let rgba_img: image::RgbaImage = img.convert();
+                Ok(RgbaTexture::from_ptr_u8(w, h, gl::RGBA, rgba_img.as_ptr()))
+            }
+            image::DynamicImage::ImageRgb16(img) => {
+                let rgb_img: image::RgbImage = img.convert();
+                Ok(RgbaTexture::from_ptr_u8(w, h, gl::RGB, rgb_img.as_ptr()))
+            }
+            image::DynamicImage::ImageRgba16(img) => {
+                let rgba_img: image::RgbaImage = img.convert();
+                Ok(RgbaTexture::from_ptr_u8(w, h, gl::RGBA, rgba_img.as_ptr()))
+            }
         }
     }
     pub fn into_image(&self) -> image::RgbaImage {

@@ -13,6 +13,7 @@ pub struct GuiContext {
     render_target: RenderTarget,
     draw_res: DrawResources,
     widgets: Vec<Box<dyn Widget + 'static>>,
+    widget_depth: Vec<usize>,
     positions: Vec<Vec2px>,
     
     widget_with_cursor: Option<usize>,
@@ -71,7 +72,6 @@ impl Entity for GuiContext {
     
     fn render(&mut self) {
         let rseq = self.render_seq.as_ref().unwrap();
-        rseq.update_resources(&mut self.draw_res);
         rseq.execute(&mut self.draw_res);
     }
 }
@@ -81,6 +81,7 @@ impl GuiContext {
         GuiContext {
             render_target: target,
             widgets: vec![],
+            widget_depth: vec![],
             positions: vec![],
             widget_with_cursor: None,
             cursor_grabbed: GrabState::NoGrab,
@@ -97,11 +98,16 @@ impl GuiContext {
     }
     
     fn rebuild_render_seq(&mut self) {
-        let mut drawer = WidgetDrawBuilder::new();
+        let mut builder = DrawBuilder::new(&mut self.draw_res);
         
-        drawer.build(&self.widgets, &self.positions);
-                
-        self.render_seq = Some(drawer.builder.to_render_sequence(&self.render_target));
+        let n = self.widgets.len();
+        for i in 0..n {
+            
+            builder.offset = Vec3::from_vec2(self.positions[i].to_pixels(1.0), self.widget_depth[i] as f32 * 0.01);
+            self.widgets[i].on_draw_build(&mut builder);
+        }
+    
+        self.render_seq = Some(builder.to_render_sequence(&self.render_target));
         
         self.render_dirty = false;
     }
@@ -118,7 +124,7 @@ impl GuiContext {
         layout_builder.build(self.render_target.logical_size());
         layout_builder.make_pos_abs(0, Vec2px::origin());
         
-        
+        self.widget_depth = parser.widget_depth;
         self.widgets = layout_builder.widgets;
         self.positions = layout_builder.positions;
         

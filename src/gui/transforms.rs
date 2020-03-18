@@ -14,6 +14,7 @@ pub struct WidgetTreeToList {
     pub widgets: Vec<Box<dyn Widget>>,
     pub postorder: Vec<usize>,
     pub child_count: Vec<usize>,
+    pub widget_depth: Vec<usize>,
     
     id_stack: Vec<usize>,
 }
@@ -24,6 +25,7 @@ impl WidgetTreeToList {
             widgets: vec![],
             postorder: vec![],
             child_count: vec![],
+            widget_depth: vec![],
             id_stack: vec![],
         }
     }
@@ -49,6 +51,7 @@ impl WidgetTreeParser for WidgetTreeToList {
         self.id_stack.push(id);
         self.widgets.push(Box::new(w));
         self.child_count.push(0);
+        self.widget_depth.push(self.id_stack.len()-1);
         
         true
     }
@@ -174,26 +177,6 @@ impl WidgetLayoutBuilder {
                     cid += 1;
                 }
             }
-        }
-    }
-}
-
-pub struct WidgetDrawBuilder {
-    pub builder: DrawBuilder,
-}
-
-impl WidgetDrawBuilder {
-    pub fn new() -> WidgetDrawBuilder {
-        WidgetDrawBuilder {
-            builder: DrawBuilder::new(),
-        }
-    }
-    
-    pub fn build(&mut self, widgets: &Vec<Box<dyn Widget>>, positions: &Vec<Vec2px>) {
-        let n = widgets.len();
-        for i in 0..n {
-            self.builder.offset = positions[i].to_pixels(1.0);
-            widgets[i].on_draw_build(&mut self.builder);
         }
     }
 }

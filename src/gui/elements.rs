@@ -219,23 +219,32 @@ impl Widget for Button {
     }
     fn on_draw_build(&self, builder: &mut DrawBuilder) {
         let c = match self.private.state {
-            ButtonState::Normal => Vec4::new(0.5, 0.0, 0.0, 1.0),
-            ButtonState::Hovered => Vec4::new(0.7, 0.2, 0.1, 1.0),
-            ButtonState::Pressed => Vec4::new(0.6, 0.1, 0.0, 1.0),
+            ButtonState::Normal => Vec4::from_bytes(37,37,38,255),
+            ButtonState::Hovered => Vec4::from_bytes(42, 45, 46, 255),
+            ButtonState::Pressed => Vec4::from_bytes(55, 55, 61, 255),
         };
-        let img = match self.private.state {
-            ButtonState::Normal => "elevator.jpg",
-            ButtonState::Hovered => "stop.jpg",
-            ButtonState::Pressed => "b2.png",
-        };
-
+        
         let rct = Rect::from_pos_size(Vec2::zero(), self.size().to_pixels(1.0));
         
-        if self.text.len() % 2 == 0 {
-            builder.add_tex_rect(rct, img);
-        } else {
-            builder.add_clr_rect(rct, c);
-        }
+        let circle = |r| {
+            let radius = 15.0;
+            
+            let s = rct.size() / 2.0 - Vec2::new(radius,radius) * 1.5;
+            
+            let offset = match r {
+                x if x < 0.25 => s,
+                x if x < 0.5 => s * Vec2::new(-1.0,1.0),
+                x if x < 0.75 => s * Vec2::new(-1.0,-1.0),
+                _ => s * Vec2::new(1.0,-1.0),
+            };
+            
+            Vec2::pol(radius, r * std::f32::consts::PI * 2.0) + rct.mid() + offset
+        };
+        
+        builder.add_clr_convex(circle, c, 42);
+        builder.offset.z += 0.005;
+        builder.add_text(self.text.clone(), "sans-serif".to_owned(), rct);
+        builder.offset.z -= 0.005;
     }
     fn on_release(&mut self) -> EventResponse {
         println!("Button {} was clicked!", self.text);

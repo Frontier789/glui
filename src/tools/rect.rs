@@ -1,4 +1,5 @@
 use super::Vec2;
+use super::Vec3;
 
 #[derive(Copy,Clone,Debug,PartialEq)]
 pub struct Rect {
@@ -36,6 +37,38 @@ impl Rect {
         }
     }
     
+    pub fn from_min_max(min: Vec2, max: Vec2) -> Rect {
+        Rect {
+            left: min.x,
+            up: min.y,
+            right: max.x,
+            down: max.y,
+        }
+    }
+    
+    pub fn mid(&self) -> Vec2 {
+        Vec2::new(
+            (self.left + self.right) / 2.0,
+            (self.up + self.down) / 2.0,
+        )
+    }
+    
+    pub fn min_wh(&self) -> f32 {
+        f32::min(self.width(), self.height())
+    }
+    
+    pub fn width(&self) -> f32 {
+        self.right - self.left
+    }
+    
+    pub fn height(&self) -> f32 {
+        self.down - self.up
+    }
+    
+    pub fn size(&self) -> Vec2 {
+        Vec2::new(self.right - self.left, self.down - self.up)
+    }
+    
     pub fn offset(self, o: Vec2) -> Rect {
         Rect {
             left: self.left + o.x,
@@ -53,6 +86,17 @@ impl Rect {
             Vec2::new(self.left, self.up),
             Vec2::new(self.right, self.down),
             Vec2::new(self.left, self.down),
+        ]
+    }
+    
+    pub fn triangulate_3d(self) -> Vec<Vec3> {
+        vec![
+            Vec3::new(self.left, self.up, 0.0),
+            Vec3::new(self.right, self.up, 0.0),
+            Vec3::new(self.right, self.down, 0.0),
+            Vec3::new(self.left, self.up, 0.0),
+            Vec3::new(self.right, self.down, 0.0),
+            Vec3::new(self.left, self.down, 0.0),
         ]
     }
     

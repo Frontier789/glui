@@ -2,11 +2,14 @@
 name = "hello-world"
 version = "0.1.0"
 [dependencies]
-glutin = "0.22.1"
+glutin = "0.24.0"
 num = "0.2.1"
 gl = "0.14.0"
-image = "0.22.5"
+image = "0.23.1"
 glui = { path = "../glui" }
 downcast-rs = "1.1.1"
 unicode-normalization = "0.1.12"
 rusttype = { version = "0.8.2", features = ["gpu_cache"] }
+font-kit = "*"
+pbr = "*"
+prettytable-rs = "*"

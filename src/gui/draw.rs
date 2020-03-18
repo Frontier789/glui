@@ -1,3 +1,4 @@
+use super::font::*;
 use gl::types::*;
 use std::collections::HashMap;
 use tools::*;
@@ -47,6 +48,7 @@ impl RenderTarget {
 pub struct DrawResources {
     shaders: HashMap<String, DrawShader>,
     textures: HashMap<String, RgbaTexture>,
+    fonts: FontLoader,
 }
 
 impl DrawResources {
@@ -54,6 +56,7 @@ impl DrawResources {
         DrawResources {
             shaders: HashMap::new(),
             textures: HashMap::new(),
+            fonts: FontLoader::new(),
         }
     }
     pub fn has_shader(&self, name: &str) -> bool {
@@ -62,22 +65,23 @@ impl DrawResources {
     pub fn has_texture(&self, name: &str) -> bool {
         self.textures.contains_key(name)
     }
-    pub fn need_texture(&mut self, name: &str) -> image::ImageResult<()> {
+    pub fn texture_id(&mut self, name: &str) -> u32 {
         if !self.textures.contains_key(name) {
-            let tex = RgbaTexture::from_file(name)?;
-            
-            self.textures.insert(
-                name.to_owned(),
-                tex,
-            );
+            if let Ok(tex) = RgbaTexture::from_file(name) {
+                let id = tex.id();
+
+                self.textures.insert(name.to_owned(), tex);
+                return id;
+            }
+            return 0;
         }
-        Ok(())
+        self.textures[name].id()
     }
     pub fn create_defaults(&mut self) -> Result<(), ShaderCompileErr> {
         let col_shader = DrawShader::compile(
             "#version 420 core
     
-    layout(location = 0) in vec2 pos;
+    layout(location = 0) in vec3 pos;
     layout(location = 1) in vec4 clr;
     
     uniform mat4 proj;
@@ -86,7 +90,7 @@ impl DrawResources {
     
     void main()
     {
-        gl_Position = proj * vec4(pos, 0, 1);
+        gl_Position = proj * vec4(pos, 1);
         
         va_clr = clr;
     }",
@@ -104,7 +108,7 @@ impl DrawResources {
         let tex_shader = DrawShader::compile(
             "#version 420 core
     
-    layout(location = 0) in vec2 pos;
+    layout(location = 0) in vec3 pos;
     layout(location = 1) in vec4 clr;
     layout(location = 2) in vec2 tpt;
     
@@ -115,7 +119,7 @@ impl DrawResources {
     
     void main()
     {
-        gl_Position = proj * vec4(pos, 0, 1);
+        gl_Position = proj * vec4(pos, 1);
         
         va_clr = clr;
         va_tpt = tpt;
@@ -143,38 +147,85 @@ impl DrawResources {
 
 #[derive(Debug)]
 struct DrawObject {
-    pts: Vec<Vec2>,
+    pts: Vec<Vec3>,
     clr: Vec4,
     tpt: Option<Vec<Vec2>>,
-    tex: Option<String>,
+    tex: Option<u32>,
+    transparent: bool,
 }
 
-pub struct DrawBuilder {
+pub struct DrawBuilder<'a> {
     objects: Vec<DrawObject>,
-    pub offset: Vec2,
+    pub offset: Vec3,
+    draw_resources: &'a mut DrawResources,
 }
 
-impl DrawBuilder {
-    pub fn new() -> DrawBuilder {
+fn offset(v: Vec<Vec3>, o: Vec3) -> Vec<Vec3> {
+    v.iter().map(|p| *p + o).collect()
+}
+
+impl<'a> DrawBuilder<'a> {
+    pub fn new(draw_resources: &mut DrawResources) -> DrawBuilder {
         DrawBuilder {
             objects: Vec::new(),
-            offset: Vec2::zero(),
+            offset: Vec3::zero(),
+            draw_resources,
         }
     }
-    pub fn add_clr_rect(&mut self, rct: Rect, clr: Vec4) {
+    pub fn add_clr_convex<FP>(&mut self, pos_fun: FP, clr: Vec4, n: usize)
+    where
+        FP: Fn(f32) -> Vec2,
+    {
+        let pts: Vec<Vec3> = (0..n).map(|i| Vec3::from_vec2(pos_fun(i as f32 / (n-1) as f32),0.0)).collect();
+        
+        let ids = (1..n-1).map(|i| vec![0,i,i+1]).flatten();
+        
         self.objects.push(DrawObject {
-            pts: rct.offset(self.offset).triangulate(),
+            pts: offset(ids.map(|i| pts[i]).collect(), self.offset),
             clr,
             tpt: None,
             tex: None,
+            transparent: clr.w < 1.0,
+        })
+    }
+    pub fn add_clr_rect(&mut self, rct: Rect, clr: Vec4) {
+        self.objects.push(DrawObject {
+            pts: offset(rct.triangulate_3d(), self.offset),
+            clr,
+            tpt: None,
+            tex: None,
+            transparent: clr.w < 1.0,
         })
     }
     pub fn add_tex_rect(&mut self, rct: Rect, tex_name: &str) {
         self.objects.push(DrawObject {
-            pts: rct.offset(self.offset).triangulate(),
+            pts: offset(rct.triangulate_3d(), self.offset),
             clr: Vec4::WHITE,
             tpt: Some(Rect::unit().triangulate()),
-            tex: Some(tex_name.to_owned()),
+            tex: Some(self.draw_resources.texture_id(tex_name)),
+            transparent: false,
+        })
+    }
+    pub fn add_text(&mut self, text: String, font: String, rct: Rect) {
+        let font = self.draw_resources.fonts.font_family(&font).unwrap();
+        let (bb_rects, uv_rects) = font.layout_paragraph(
+            &text,
+            24.0,
+            24.0,
+            (HAlign::Center, VAlign::Center),
+            rct.size(),
+        );
+        let o = self.offset;
+        self.objects.push(DrawObject {
+            pts: bb_rects
+                .iter()
+                .map(|r| offset(r.triangulate_3d(), o))
+                .flatten()
+                .collect(),
+            clr: Vec4::WHITE,
+            tpt: Some(uv_rects.iter().map(|r| r.triangulate()).flatten().collect()),
+            tex: Some(font.tex.id()),
+            transparent: true,
         })
     }
 
@@ -185,7 +236,7 @@ impl DrawBuilder {
         render_seq: &mut RenderSequence,
         render_target: &RenderTarget,
     ) {
-        let pts: Vec<Vec2> = self.objects[beg..end]
+        let pts: Vec<Vec3> = self.objects[beg..end]
             .iter()
             .map(|o| o.pts.clone())
             .flatten()
@@ -194,9 +245,11 @@ impl DrawBuilder {
 
         let clr: Vec<Vec4> = self.objects[beg..end]
             .iter()
-            .map(|o| vec![o.clr; 6])
+            .map(|o| vec![o.clr; o.pts.len()])
             .flatten()
             .collect();
+
+        let pts_count: usize = self.objects[beg..end].iter().map(|o| o.pts.len()).sum();
         let pbuf = Buffer::from_vec(pts);
         let cbuf = Buffer::from_vec(clr);
         let mut vao = VertexArray::new();
@@ -216,9 +269,7 @@ impl DrawBuilder {
                 -1.0,
             ),
         )];
-        
         let shader_name;
-        
         if let (Some(tex), Some(_)) = (&self.objects[beg].tex, &self.objects[beg].tpt) {
             let tpt: Vec<Vec2> = self.objects[beg..end]
                 .iter()
@@ -229,27 +280,28 @@ impl DrawBuilder {
             vao.attrib_buffer(2, &tbuf);
             shader_name = "tex_shader".to_owned();
             render_seq.buffers.push(tbuf.as_base_type());
-            
-            uniforms.push(Uniform::Texture2D(
-                "tex".to_owned(),
-                tex.clone(),
-            ));
+
+            uniforms.push(Uniform::Texture2D("tex".to_owned(), tex.clone()));
         } else {
             shader_name = "col_shader".to_owned();
         }
-        
         render_seq.commands.push(RenderCommand {
             vao,
             mode: DrawMode::Triangles,
             first: 0,
-            count: (end - beg) * 6,
+            count: pts_count,
             shader: shader_name,
-            uniforms
+            uniforms,
+            transparent: self.objects[beg].transparent,
         });
     }
 
     pub fn to_render_sequence(mut self, render_target: &RenderTarget) -> RenderSequence {
-        let cmp_dobj = |o1: &DrawObject, o2: &DrawObject| o1.tex.cmp(&o2.tex);
+        let cmp_dobj = |o1: &DrawObject, o2: &DrawObject| {
+            o1.transparent
+                .cmp(&o2.transparent)
+                .then(o1.tex.cmp(&o2.tex))
+        };
         self.objects.sort_by(cmp_dobj);
         let n = self.objects.len();
         let mut r = RenderSequence::new();
@@ -273,7 +325,7 @@ enum Uniform {
     Vector2(String, Vec2),
     Vector4(String, Vec4),
     Matrix4(String, Mat4),
-    Texture2D(String, String),
+    Texture2D(String, u32),
 }
 
 pub struct RenderSequence {
@@ -288,17 +340,6 @@ impl RenderSequence {
             commands: vec![],
         }
     }
-    
-    pub fn update_resources(&self, resources: &mut DrawResources) {
-        for cmd in &self.commands {
-            for u in &cmd.uniforms {
-                if let Uniform::Texture2D(_, tex) = u {
-                    resources.need_texture(tex).unwrap();
-                }
-            }
-        }
-    }
-    
     pub fn execute(&self, resources: &mut DrawResources) {
         for cmd in &self.commands {
             cmd.vao.bind();
@@ -316,7 +357,7 @@ impl RenderSequence {
                         shader.set_uniform(id, *value);
                     }
                     Uniform::Texture2D(id, value) => {
-                        shader.set_uniform(id, &resources.textures[value]);
+                        shader.uniform_tex2d_id(id, *value);
                     }
                 }
             }
@@ -332,11 +373,18 @@ struct RenderCommand {
     pub count: usize,
     pub shader: String,
     pub uniforms: Vec<Uniform>,
+    pub transparent: bool,
 }
 
 impl RenderCommand {
     fn execute(&self) {
         unsafe {
+            if self.transparent {
+                gl::Enable(gl::BLEND);
+                gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
+            } else {
+                gl::Disable(gl::BLEND);
+            }
             gl::DrawArrays(self.mode.into(), self.first as GLint, self.count as GLsizei);
         }
     }

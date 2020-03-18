@@ -20,6 +20,10 @@ impl Vec4 {
         Vec4{x:xyz.x,y:xyz.y,z:xyz.z,w:w}
     }
     
+    pub fn from_bytes(r: u8,g: u8,b: u8,a: u8) -> Vec4 {
+        Vec4{x:r as f32 / 255.0,y:g as f32 / 255.0,z:b as f32 / 255.0,w:a as f32 / 255.0,}
+    }
+    
     pub fn new(x: f32, y: f32, z: f32, w: f32) -> Vec4 {
         Vec4{x:x,y:y,z:z,w:w}
     }
