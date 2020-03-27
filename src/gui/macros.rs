@@ -73,10 +73,11 @@ macro_rules! register_gui_element {
     ($class:ident, $context:ident @ $( $x:tt )* ) => {
         {
             let tmp = register_gui_element_struct_init! { $class {} @ $( $x )* };
-            if $context.parse_push(tmp) {
-                register_gui_element_children! { $( $x )* }
-            }
-            $context.parse_pop::<$class>();
+            $context.parse_push(tmp);
+            
+            register_gui_element_children! { $( $x )* }
+            
+            $context.parse_pop();
         }
     };
 }

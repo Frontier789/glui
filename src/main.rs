@@ -53,7 +53,10 @@ fn experimental(parser: &mut WidgetTreeToList, _data: ()) {
     FixedPanel {
         size: 50.0,
         children: {
-            Button {text: "hello".to_owned()};
+            Padding {
+                left: 20.0,
+                children:{Text {text: "hello".to_owned(), font: "arial".to_owned(), align: font::align(HAlign::Left, VAlign::Center), color: Vec4::RED};}
+            };
             GridLayout {
                 col_widths: vec![1.0; 5],
                 row_heights: vec![1.0; 5],
@@ -94,5 +97,5 @@ fn main() {
     cont.build_gui(experimental, ());
     win.world.add_entity(Box::new(cont));
     
-    win.run(GuiWinProps::tester());
+    win.run(GuiWinProps::quick_tester());
 }

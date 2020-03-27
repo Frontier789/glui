@@ -2,6 +2,7 @@ use crate::downcast_rs::Downcast;
 
 use super::DrawBuilder;
 use tools::*;
+use super::WidgetTreeToList;
 
 #[derive(Copy, Clone)]
 pub enum WidgetSize {
@@ -43,6 +44,8 @@ pub enum EventResponse {
 
 pub trait Widget: Downcast {
     fn constraint(&mut self, _self_constraint: WidgetConstraints) {}
+    
+    fn expand(&self) -> Vec<Box<dyn Widget>> {vec![]}
 
     fn place_child(&mut self, _child_size: Vec2px) -> Vec2px {
         Vec2px::zero()

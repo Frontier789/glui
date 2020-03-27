@@ -21,8 +21,12 @@ impl Vec2 {
         Self{x:std::f32::INFINITY, y:std::f32::INFINITY}
     }
     
-    pub fn new<T: Into<f32>>(x: T, y: T) -> Self {
-        Self{x:x.into(), y:y.into()}
+    pub fn new(x: f32, y: f32) -> Self {
+        Self{x:x, y:y}
+    }
+    
+    pub fn xy(xy: f32) -> Self {
+        Self{x:xy, y:xy}
     }
     
     pub fn pol(len: f32, angle: f32) -> Self {
@@ -36,12 +40,31 @@ impl Vec2 {
         num::Float::sqrt(self.x * self.x + self.y * self.y)
     }
     
+    pub fn length_squared(&self) -> f32 {
+        self.x * self.x + self.y * self.y
+    }
+    
     pub fn sgn(&self) -> Self {
         let l = self.length();
         Self {
             x: self.x/l,
             y: self.y/l
         }
+    }
+    
+    pub fn minxy(&self) -> f32 {
+        if self.x < self.y {
+            self.x
+        } else {
+            self.y
+        }
+    }
+    
+    pub fn unsign(&self) -> Self {
+        Vec2::new(
+            f32::abs(self.x),
+            f32::abs(self.y),
+        )
     }
     
     pub fn dot(&self, v: Self) -> f32 {

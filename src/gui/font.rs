@@ -192,21 +192,38 @@ impl From<rusttype::Error> for FontError {
     }
 }
 
-#[derive(Debug,PartialEq,Eq)]
+#[derive(Debug,Copy,Clone,PartialEq,Eq)]
 pub enum HAlign {
     Left,
     Center,
     Right,
 }
 
-#[derive(Debug,PartialEq,Eq)]
+#[derive(Debug,Copy,Clone,PartialEq,Eq)]
 pub enum VAlign {
     Top,
     Center,
     Bottom,
 }
 
-type Align = (HAlign, VAlign);
+#[derive(Debug,Copy,Clone,PartialEq,Eq)]
+pub struct Align {
+    pub horizontal: HAlign,
+    pub vertical: VAlign,
+}
+
+pub fn align(horizontal: HAlign,vertical: VAlign) -> Align {
+    Align{
+        horizontal,
+        vertical,
+    }
+}
+
+impl Default for Align {
+    fn default() -> Align {
+        align(HAlign::Center,VAlign::Center)
+    }
+}
 
 impl Font {
     fn from_collection(collection: &rusttype::FontCollection<'static>, index: usize) -> Result<Font, FontError> {
@@ -271,13 +288,13 @@ impl Font {
             let p_old = g.position();
             let mut p = g.position();
             
-            match align.0 {
+            match align.horizontal {
                 HAlign::Left => {},
                 HAlign::Center => p.x += (size.x - w) / 2.0,
                 HAlign::Right => p.x += size.x - w,
             };
             
-            match align.1 {
+            match align.vertical {
                 VAlign::Top => {},
                 VAlign::Center => p.y += (size.y - all_height) / 2.0,
                 VAlign::Bottom => p.y += size.y - all_height,
@@ -320,8 +337,8 @@ impl Font {
         for g in glyphs {
             let (uv,bb) = cache.rect_for(0, &g).unwrap().unwrap();
             
-            uv_rects.push(Rect{left: uv.min.x, right: uv.max.x, up: uv.min.y, down: uv.max.y, });
-            bb_rects.push(Rect{left: bb.min.x as f32, right: bb.max.x as f32, up: bb.min.y as f32, down: bb.max.y as f32, });
+            uv_rects.push(Rect{left: uv.min.x, right: uv.max.x, top: uv.min.y, bottom: uv.max.y, });
+            bb_rects.push(Rect{left: bb.min.x as f32, right: bb.max.x as f32, top: bb.min.y as f32, bottom: bb.max.y as f32, });
         }
         
         (bb_rects, uv_rects)

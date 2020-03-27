@@ -1,27 +1,18 @@
 use super::*;
 
-pub trait WidgetTreeParser {
-    fn parse_push<T>(&mut self, w: T) -> bool
-    where
-        T: Widget + 'static;
-    
-    fn parse_pop<T>(&mut self)
-    where
-        T: Widget + 'static;
-}
-
 pub struct WidgetTreeToList {
     pub widgets: Vec<Box<dyn Widget>>,
+    pub parents: Vec<Option<usize>>,
     pub postorder: Vec<usize>,
     pub child_count: Vec<usize>,
     pub widget_depth: Vec<usize>,
-    
     id_stack: Vec<usize>,
 }
 
 impl WidgetTreeToList {
     pub fn new() -> Self {
         Self {
+            parents: vec![],
             widgets: vec![],
             postorder: vec![],
             child_count: vec![],
@@ -29,36 +20,40 @@ impl WidgetTreeToList {
             id_stack: vec![],
         }
     }
-    
     pub fn widget_count(&self) -> usize {
         self.widgets.len()
     }
-}
-
-impl WidgetTreeParser for WidgetTreeToList {
-    fn parse_push<T>(&mut self, w: T) -> bool
-    where
-        T: Widget + 'static,
+    pub fn parse_push_widget(&mut self, w: Box<dyn Widget>)
     {
         match self.id_stack.last() {
-            None => (),
+            None => {
+                self.parents.push(None);
+            },
             Some(&parid) => {
+                self.parents.push(Some(parid));
                 self.child_count[parid] += 1;
             }
         }
-        
         let id = self.widgets.len();
         self.id_stack.push(id);
-        self.widgets.push(Box::new(w));
         self.child_count.push(0);
-        self.widget_depth.push(self.id_stack.len()-1);
+        self.widget_depth.push(self.id_stack.len() - 1);
         
-        true
+        let children = w.expand();
+        self.widgets.push(w);
+        
+        for c in children {
+            self.parse_push_widget(c);
+            self.parse_pop();
+        }
     }
-    
-    fn parse_pop<T>(&mut self)
+    pub fn parse_push<T>(&mut self, w: T)
     where
         T: Widget + 'static,
+    {
+        self.parse_push_widget(Box::new(w));
+    }
+    pub fn parse_pop(&mut self)
     {
         let id = self.id_stack.pop().unwrap();
         self.postorder.push(id);
@@ -68,11 +63,9 @@ impl WidgetTreeParser for WidgetTreeToList {
 pub struct WidgetLayoutBuilder {
     pub widgets: Vec<Box<dyn Widget>>,
     pub postorder: Vec<usize>,
-    
     pub child_count: Vec<usize>,
     pub constraints: Vec<WidgetConstraints>,
     pub positions: Vec<Vec2px>,
-    
     next_child_constraints: Vec<WidgetConstraints>,
     win_size: Vec2px,
 }
@@ -99,7 +92,6 @@ impl WidgetLayoutBuilder {
         self.positions.resize(n, Default::default());
         self.next_child_constraints.resize(n, Default::default());
     }
-    
     fn pop(&mut self, id: usize, parent: Option<usize>) {
         self.positions[id] = match parent {
             Some(parid) => {
@@ -109,7 +101,6 @@ impl WidgetLayoutBuilder {
             None => Vec2px::zero(),
         }
     }
-    
     fn push(&mut self, id: usize, parent: Option<usize>) {
         match parent {
             Some(parid) => {
@@ -130,13 +121,11 @@ impl WidgetLayoutBuilder {
         }
 
         self.widgets[id].constraint(self.constraints[id]);
-        
         self.next_child_constraints[id] = match self.widgets[id].child_constraint() {
             Some(cons) => cons,
             None => self.constraints[id],
         }
     }
-    
     pub fn make_pos_abs(&mut self, index: usize, offset: Vec2px) -> usize {
         let n = self.child_count[index];
         let mut index = index + 1;
@@ -146,7 +135,6 @@ impl WidgetLayoutBuilder {
         }
         index
     }
-    
     pub fn build(&mut self, win_size: Vec2px) {
         let n = self.widgets.len();
         self.win_size = win_size;

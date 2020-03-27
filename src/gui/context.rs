@@ -1,6 +1,7 @@
 use super::*;
 use super::GlutinEvent;
 use crate::ecs::Entity;
+use std::time::Instant;
 
 #[derive(Copy,Clone,Debug,PartialEq,Eq)]
 enum GrabState {
@@ -13,14 +14,16 @@ pub struct GuiContext {
     render_target: RenderTarget,
     draw_res: DrawResources,
     widgets: Vec<Box<dyn Widget + 'static>>,
+    parents: Vec<Option<usize>>,
+    child_count: Vec<usize>,
     widget_depth: Vec<usize>,
     positions: Vec<Vec2px>,
     
-    widget_with_cursor: Option<usize>,
+    active_widget: Option<usize>,
+    cursor_hierarchy: Option<usize>,
     cursor_grabbed: GrabState,
     
     cursor_pos: Vec2,
-    recheck_cursor: bool,
     
     render_seq: Option<RenderSequence>,
     
@@ -61,12 +64,15 @@ impl Entity for GuiContext {
             _ => (),
         }
         
-        if self.recheck_cursor {
-            self.check_cursor();
-        }
-        
         if self.render_dirty {
+            let i = Instant::now();
             self.rebuild_render_seq();
+            let d = i.elapsed();
+            unsafe {
+                gl::Flush();
+                gl::Finish();
+            }
+            println!("render: {}",d.as_secs_f64());
         }
     }
     
@@ -81,12 +87,14 @@ impl GuiContext {
         GuiContext {
             render_target: target,
             widgets: vec![],
+            parents: vec![],
+            child_count: vec![],
             widget_depth: vec![],
             positions: vec![],
-            widget_with_cursor: None,
+            cursor_hierarchy: None,
+            active_widget: None,
             cursor_grabbed: GrabState::NoGrab,
             cursor_pos: Vec2::new(-1.0,-1.0),
-            recheck_cursor: true,
             render_seq: None,
             render_dirty: true,
             draw_res: DrawResources::new(),
@@ -124,6 +132,8 @@ impl GuiContext {
         layout_builder.build(self.render_target.logical_size());
         layout_builder.make_pos_abs(0, Vec2px::origin());
         
+        self.child_count = layout_builder.child_count;
+        self.parents = parser.parents;
         self.widget_depth = parser.widget_depth;
         self.widgets = layout_builder.widgets;
         self.positions = layout_builder.positions;
@@ -144,12 +154,11 @@ impl GuiContext {
     pub fn button_released(&mut self, button: GlutinButton) {
         if button != GlutinButton::Left { return; }
         
-        match (self.widget_with_cursor, self.cursor_grabbed) {
+        match (self.active_widget, self.cursor_grabbed) {
             (_, GrabState::GrabbedOutside) => {
-                self.recheck_cursor = true;
+                self.rebuild_cursor_inside(self.cursor_pos);
             },
             (Some(id), GrabState::GrabbedInside) => {
-                self.recheck_cursor = true;
                 if self.widgets[id].on_release() == EventResponse::HandledRedraw {
                     self.render_dirty = true;
                 }
@@ -163,12 +172,27 @@ impl GuiContext {
     pub fn button_pressed(&mut self, button: GlutinButton) {
         if button != GlutinButton::Left { return; }
         
-        match self.widget_with_cursor {
-            Some(id) => {
-                if self.widgets[id].on_press() == EventResponse::HandledRedraw {
+        match self.cursor_hierarchy {
+            Some(mut id) => {
+                let mut result = self.widgets[id].on_press();
+                
+                while result == EventResponse::Pass {
+                    if let Some(parent) = self.parents[id] {
+                        result = self.widgets[parent].on_press();
+                        id = parent;
+                    } else {
+                        break;
+                    }
+                }
+                
+                if result != EventResponse::Pass {
+                    self.active_widget  = Some(id);
+                    self.cursor_grabbed = GrabState::GrabbedInside;
+                }
+                
+                if result == EventResponse::HandledRedraw {
                     self.render_dirty = true;
                 }
-                self.cursor_grabbed = GrabState::GrabbedInside;
             },
             _ => {}
         }
@@ -186,61 +210,106 @@ impl GuiContext {
         self.cursor_moved(Vec2::new(-1.0, -1.0));
     }
     
-    pub fn cursor_moved(&mut self, p: Vec2) {
-        self.cursor_pos = p;
-        self.recheck_cursor = true;
+    fn point_in_widget(&self, id: usize, p: Vec2) -> bool {
+        let scl = self.render_target.gui_scale;
+        let pos = self.positions[id].to_pixels(scl);
+        let siz = self.widgets[id].size().to_pixels(scl);
+        
+        Rect::from_pos_size(pos, siz).contains(p)
     }
     
-    fn cursor_hit_test(&self) -> std::option::Option<usize> {
-        let p = self.cursor_pos;
-        let scl = self.render_target.gui_scale;
-        
-        for i in (0..self.widget_count()).rev() {
-            let pos = self.positions[i].to_pixels(scl);
-            let siz = self.widgets[i].size().to_pixels(scl);
-            
-            if Rect::from_pos_size(pos, siz).contains(p) {
-                return Some(i);
+    fn fire_enter_leave_event(&mut self, id: usize, enter: bool) {
+        if enter {
+            if self.widgets[id].on_cursor_enter() == EventResponse::HandledRedraw {
+                self.render_dirty = true;
+            }
+        } else {
+            if self.widgets[id].on_cursor_leave() == EventResponse::HandledRedraw {
+                self.render_dirty = true;
             }
         }
-        
-        None
     }
     
-    fn check_cursor(&mut self) {
+    pub fn cursor_moved(&mut self, p: Vec2) {
+        self.cursor_pos = p;
         
-        let i = self.cursor_hit_test();
+        let mut grab = self.cursor_grabbed;
         
         match self.cursor_grabbed {
             GrabState::NoGrab => {
-                if self.widget_with_cursor != i {
-                    if let Some(id) = self.widget_with_cursor {
-                        if self.widgets[id].on_cursor_leave() == EventResponse::HandledRedraw {
-                            self.render_dirty = true;
-                        }
-                    }
-                    
-                    if let Some(id) = i {
-                        if self.widgets[id].on_cursor_enter() == EventResponse::HandledRedraw {
-                            self.render_dirty = true;
-                        }
-                    }
-                    
-                    self.widget_with_cursor = i;
-                }
+                self.rebuild_cursor_inside(p);
             },
             GrabState::GrabbedInside => {
-                if self.widget_with_cursor != i {
-                    self.cursor_grabbed = GrabState::GrabbedOutside;
+                if let Some(i) = self.cursor_hierarchy {
+                    if !self.point_in_widget(i, p) {
+                        self.fire_enter_leave_event(i, false);
+                        grab = GrabState::GrabbedOutside;
+                    }
                 }
             },
             GrabState::GrabbedOutside => {
-                if self.widget_with_cursor == i {
-                    self.cursor_grabbed = GrabState::GrabbedInside;
+                if let Some(i) = self.cursor_hierarchy {
+                    if self.point_in_widget(i, p) {
+                        self.fire_enter_leave_event(i, true);
+                        grab = GrabState::GrabbedInside;
+                    }
                 }
             },
+        };
+        
+        self.cursor_grabbed = grab;
+    }
+    
+    fn pop_cursor_hierarchy(&mut self) {
+        if let Some(i) = self.cursor_hierarchy {
+            self.cursor_hierarchy = self.parents[i];
+        }
+    }
+    
+    fn complete_cursor_inside(&mut self, mut i: usize, p: Vec2) {
+        let c = self.child_count[i];
+        
+        i += 1;
+        
+        for _ in 0..c {
+            if self.point_in_widget(i, p) {
+                self.cursor_hierarchy = Some(i);
+                self.fire_enter_leave_event(i, true);
+                self.complete_cursor_inside(i, p);
+                break;
+            }
+            i += self.child_count[i] + 1;
+        }
+    }
+    
+    fn rebuild_cursor_inside(&mut self, p: Vec2) {
+        let mut reduced = self.cursor_hierarchy.is_none();
+        while !reduced {
+            reduced = true;
+            
+            if let Some(id) = self.cursor_hierarchy {
+                if !self.point_in_widget(id, p) {
+                    reduced = false;
+                    self.fire_enter_leave_event(id, false);
+                    self.pop_cursor_hierarchy();
+                }
+            }
         }
         
-        self.recheck_cursor = false;
+        if self.cursor_hierarchy.is_none() {
+            let mut i = 0;
+            while i < self.widget_count() {
+                if self.point_in_widget(i, p) {
+                    self.cursor_hierarchy = Some(i);
+                    self.fire_enter_leave_event(i, true);
+                    break;
+                }
+                i += self.child_count[i] + 1;
+            }
+        }
+        
+        if let Some(i) = self.cursor_hierarchy {
+            self.complete_cursor_inside(i,p);
+        }
     }
 }

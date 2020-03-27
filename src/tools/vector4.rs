@@ -1,9 +1,9 @@
 extern crate num;
 
-use std::ops::{Add,Sub,Mul,Div,AddAssign,SubAssign,MulAssign,DivAssign};
 use super::vector3::Vec3;
+use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
 
-#[derive(Copy,Clone,Debug,PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Vec4 {
     pub x: f32,
     pub y: f32,
@@ -13,31 +13,86 @@ pub struct Vec4 {
 
 impl Vec4 {
     pub fn origin() -> Vec4 {
-        Vec4{x:0.0,y:0.0,z:0.0,w:1.0}
+        Vec4 {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            w: 1.0,
+        }
     }
-    
-    pub fn from_vec3(xyz: Vec3,w: f32) -> Vec4 {
-        Vec4{x:xyz.x,y:xyz.y,z:xyz.z,w:w}
+
+    pub fn from_vec3(xyz: Vec3, w: f32) -> Vec4 {
+        Vec4 {
+            x: xyz.x,
+            y: xyz.y,
+            z: xyz.z,
+            w: w,
+        }
     }
-    
-    pub fn from_bytes(r: u8,g: u8,b: u8,a: u8) -> Vec4 {
-        Vec4{x:r as f32 / 255.0,y:g as f32 / 255.0,z:b as f32 / 255.0,w:a as f32 / 255.0,}
+
+    pub fn from_bytes(r: u8, g: u8, b: u8, a: u8) -> Vec4 {
+        Vec4 {
+            x: r as f32 / 255.0,
+            y: g as f32 / 255.0,
+            z: b as f32 / 255.0,
+            w: a as f32 / 255.0,
+        }
     }
-    
     pub fn new(x: f32, y: f32, z: f32, w: f32) -> Vec4 {
-        Vec4{x:x,y:y,z:z,w:w}
+        Vec4 {
+            x: x,
+            y: y,
+            z: z,
+            w: w,
+        }
     }
-    
     pub fn rgb(&self) -> Vec3 {
-        Vec3 {x:self.x, y:self.y, z:self.z}
+        Vec3 {
+            x: self.x,
+            y: self.y,
+            z: self.z,
+        }
     }
-    
     pub fn dot(&self, v: Vec4) -> f32 {
         self.x * v.x + self.y * v.y + self.z * v.z
     }
-    
-    pub const WHITE : Vec4 = Vec4 {x:1.0,y:1.0,z:1.0,w:1.0};
-    pub const BLACK : Vec4 = Vec4 {x:0.0,y:0.0,z:0.0,w:1.0};
+
+    pub const WHITE: Vec4 = Vec4 {
+        x: 1.0,
+        y: 1.0,
+        z: 1.0,
+        w: 1.0,
+    };
+    pub const BLACK: Vec4 = Vec4 {
+        x: 0.0,
+        y: 0.0,
+        z: 0.0,
+        w: 1.0,
+    };
+    pub const RED: Vec4 = Vec4 {
+        x: 1.0,
+        y: 0.0,
+        z: 0.0,
+        w: 1.0,
+    };
+    pub const GREEN: Vec4 = Vec4 {
+        x: 0.0,
+        y: 1.0,
+        z: 0.0,
+        w: 1.0,
+    };
+    pub const BLUE: Vec4 = Vec4 {
+        x: 0.0,
+        y: 0.0,
+        z: 1.0,
+        w: 1.0,
+    };
+}
+
+impl Default for Vec4 {
+    fn default() -> Vec4 {
+        Vec4::new(0.0, 0.0, 0.0, 1.0)
+    }
 }
 
 // A op B
@@ -97,7 +152,6 @@ impl Div for Vec4 {
 // A op= B
 
 impl AddAssign for Vec4 {
-
     fn add_assign(&mut self, other: Vec4) {
         self.x += other.x;
         self.y += other.y;
@@ -107,7 +161,6 @@ impl AddAssign for Vec4 {
 }
 
 impl SubAssign for Vec4 {
-
     fn sub_assign(&mut self, other: Vec4) {
         self.x -= other.x;
         self.y -= other.y;
@@ -117,7 +170,6 @@ impl SubAssign for Vec4 {
 }
 
 impl MulAssign for Vec4 {
-
     fn mul_assign(&mut self, other: Vec4) {
         self.x *= other.x;
         self.y *= other.y;
@@ -127,7 +179,6 @@ impl MulAssign for Vec4 {
 }
 
 impl DivAssign for Vec4 {
-
     fn div_assign(&mut self, other: Vec4) {
         self.x /= other.x;
         self.y /= other.y;
@@ -227,6 +278,5 @@ impl DivAssign<i32> for Vec4 {
         self.w /= factor as f32;
     }
 }
-
 
 // pub type Vec4f = Vec4;

@@ -3,6 +3,8 @@ use gl::types::*;
 use std::collections::HashMap;
 use tools::*;
 
+use super::font;
+
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
 pub struct GLVerion {
     major: usize,
@@ -146,9 +148,16 @@ impl DrawResources {
 }
 
 #[derive(Debug)]
+enum DrawColor {
+    Array(Vec<Vec4>),
+    Const(Vec4),
+    Default,
+}
+
+#[derive(Debug)]
 struct DrawObject {
     pts: Vec<Vec3>,
-    clr: Vec4,
+    clr: DrawColor,
     tpt: Option<Vec<Vec2>>,
     tex: Option<u32>,
     transparent: bool,
@@ -172,26 +181,80 @@ impl<'a> DrawBuilder<'a> {
             draw_resources,
         }
     }
-    pub fn add_clr_convex<FP>(&mut self, pos_fun: FP, clr: Vec4, n: usize)
+    pub fn add_clr_convex<FP>(&mut self, pos_fun: FP, clr: Vec4, n: usize, antialias: bool)
     where
         FP: Fn(f32) -> Vec2,
     {
-        let pts: Vec<Vec3> = (0..n).map(|i| Vec3::from_vec2(pos_fun(i as f32 / (n-1) as f32),0.0)).collect();
+        let pts: Vec<Vec2> = (0..n).map(|i| pos_fun(i as f32 / n as f32)).collect();
+        let norm: Vec<Vec2> = (0..n)
+            .map(|i| {
+                let a = pts[(i + n - 1) % n];
+                let b = pts[i];
+                let c = pts[(i + 1) % n];
+                ((a - b).perp() + (b - c).perp()).sgn()
+            })
+            .collect();
         
-        let ids = (1..n-1).map(|i| vec![0,i,i+1]).flatten();
+        let id_to_p = |&i| {
+            Vec3::from_vec2(
+                
+                if i < n {
+                    let normal: Vec2 = norm[i];
+                    
+                    pts[i] - normal * 0.8
+                } else {
+                    let normal: Vec2 = norm[i-n];
+                    
+                    pts[i-n] + normal * normal.unsign().minxy() * 1.1
+                },
+                0.0,
+            )
+        };
+        
+        let id_to_c = |&i| {
+            let mut c = clr;
+            if i >= n {
+                let normal: Vec2 = norm[i-n];
+                
+                let x = normal.unsign().minxy();
+                
+                c.w = if x >= 0.03 {
+                    1.0 - f32::powf(x - 0.03,0.3)
+                } else {
+                    let x = x * 10.0;
+                    
+                    1.0 - f32::powf(3.0*x*x - 2.0*x*x*x,1.5)
+                };
+            }
+            c
+        };
+        
+        let ids_fill = (1..n - 1).map(|i| vec![0, i, i + 1]).flatten();
+        let ids_outline = (0..n)
+            .map(|i| vec![i, (i + 1) % n, (i + 1) % n + n, i, (i + 1) % n + n, i + n])
+            .flatten();
+        
+        let ids = if antialias {
+            ids_outline.chain(ids_fill).collect::<Vec<usize>>()
+        } else {
+            ids_fill.collect::<Vec<usize>>()
+        };
+        
+        let ids = ids.iter();
+        
         
         self.objects.push(DrawObject {
-            pts: offset(ids.map(|i| pts[i]).collect(), self.offset),
-            clr,
+            pts: offset(ids.clone().map(id_to_p).collect(), self.offset),
+            clr: DrawColor::Array(ids.map(id_to_c).collect()),
             tpt: None,
             tex: None,
-            transparent: clr.w < 1.0,
+            transparent: antialias,
         })
     }
     pub fn add_clr_rect(&mut self, rct: Rect, clr: Vec4) {
         self.objects.push(DrawObject {
             pts: offset(rct.triangulate_3d(), self.offset),
-            clr,
+            clr: DrawColor::Default,
             tpt: None,
             tex: None,
             transparent: clr.w < 1.0,
@@ -200,20 +263,20 @@ impl<'a> DrawBuilder<'a> {
     pub fn add_tex_rect(&mut self, rct: Rect, tex_name: &str) {
         self.objects.push(DrawObject {
             pts: offset(rct.triangulate_3d(), self.offset),
-            clr: Vec4::WHITE,
+            clr: DrawColor::Default,
             tpt: Some(Rect::unit().triangulate()),
             tex: Some(self.draw_resources.texture_id(tex_name)),
             transparent: false,
         })
     }
-    pub fn add_text(&mut self, text: String, font: String, rct: Rect) {
+    pub fn add_text(&mut self, text: String, font: String, size: Vec2, clr: Vec4, align: font::Align) {
         let font = self.draw_resources.fonts.font_family(&font).unwrap();
         let (bb_rects, uv_rects) = font.layout_paragraph(
             &text,
             24.0,
             24.0,
-            (HAlign::Center, VAlign::Center),
-            rct.size(),
+            align,
+            size,
         );
         let o = self.offset;
         self.objects.push(DrawObject {
@@ -222,7 +285,7 @@ impl<'a> DrawBuilder<'a> {
                 .map(|r| offset(r.triangulate_3d(), o))
                 .flatten()
                 .collect(),
-            clr: Vec4::WHITE,
+            clr: DrawColor::Const(clr),
             tpt: Some(uv_rects.iter().map(|r| r.triangulate()).flatten().collect()),
             tex: Some(font.tex.id()),
             transparent: true,
@@ -245,7 +308,11 @@ impl<'a> DrawBuilder<'a> {
 
         let clr: Vec<Vec4> = self.objects[beg..end]
             .iter()
-            .map(|o| vec![o.clr; o.pts.len()])
+            .map(|o| match &o.clr {
+                DrawColor::Array(v) => v.clone(),
+                DrawColor::Const(c) => vec![*c; o.pts.len()],
+                DrawColor::Default  => vec![Vec4::WHITE; o.pts.len()],
+            })
             .flatten()
             .collect();
 

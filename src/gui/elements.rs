@@ -185,6 +185,77 @@ impl Widget for GridLayout {
     }
 }
 
+#[derive(Default)]
+pub struct PaddingPrivate {
+    real_size: Vec2px,
+}
+
+#[derive(Default)]
+pub struct Padding {
+    pub left: f32,
+    pub right: f32,
+    pub top: f32,
+    pub bottom: f32,
+    pub private: PaddingPrivate,
+}
+
+impl Widget for Padding {
+    fn constraint(&mut self, self_constraint: WidgetConstraints) {
+        self.private.real_size = self_constraint.max_size;
+    }
+    fn size(&self) -> Vec2px {
+        self.private.real_size
+    }
+    fn child_constraint(&self) -> Option<WidgetConstraints> {
+        Some(WidgetConstraints {
+            max_size: self.size() - Vec2px::new(self.left + self.right, self.top + self.bottom),
+        })
+    }
+
+    fn place_child(&mut self, _child_size: Vec2px) -> Vec2px {
+        Vec2px::new(self.left + self.right, self.top + self.bottom)
+    }
+}
+
+#[derive(Default)]
+pub struct TextPrivate {
+    real_size: Vec2px,
+}
+
+pub struct Text {
+    pub text: String,
+    pub color: Vec4,
+    pub size: WidgetSize,
+    pub align: font::Align,
+    pub font: String,
+    pub private: TextPrivate,
+}
+
+impl Default for Text {
+    fn default() -> Text {
+        Text {
+            text: Default::default(),
+            color: Default::default(),
+            size: Default::default(),
+            align: Default::default(),
+            font: "sans-serif".to_owned(),
+            private: Default::default(),
+        }
+    }
+}
+
+impl Widget for Text {
+    fn constraint(&mut self, self_constraint: WidgetConstraints) {
+        self.private.real_size = self.size.to_units(self_constraint.max_size);
+    }
+    fn size(&self) -> Vec2px {
+        self.private.real_size
+    }
+    fn on_draw_build(&self, builder: &mut DrawBuilder) {
+        builder.add_text(self.text.clone(), self.font.clone(), self.size().to_pixels(1.0), self.color, self.align);
+    }
+}
+
 enum ButtonState {
     Normal,
     Hovered,
@@ -203,11 +274,24 @@ pub struct ButtonPrivate {
     real_size: Vec2px,
 }
 
-#[derive(Default)]
 pub struct Button {
-    pub text: String,
     pub size: WidgetSize,
+    pub text: String,
+    pub text_color: Vec4,
+    pub font: String,
     pub private: ButtonPrivate,
+}
+
+impl Default for Button {
+    fn default() -> Button {
+        Button {
+            size: Default::default(),
+            text: Default::default(),
+            text_color: Vec4::WHITE,
+            font: Default::default(),
+            private: Default::default(),
+        }
+    }
 }
 
 impl Widget for Button {
@@ -217,6 +301,14 @@ impl Widget for Button {
     fn size(&self) -> Vec2px {
         self.private.real_size
     }
+    fn expand(&self) -> Vec<Box<dyn Widget>> {
+        vec![Box::new(Text {
+            text: self.text.clone(),
+            color: self.text_color,
+            font: self.font.clone(),
+            ..Default::default()
+        })]
+    }
     fn on_draw_build(&self, builder: &mut DrawBuilder) {
         let c = match self.private.state {
             ButtonState::Normal => Vec4::from_bytes(37,37,38,255),
@@ -224,12 +316,12 @@ impl Widget for Button {
             ButtonState::Pressed => Vec4::from_bytes(55, 55, 61, 255),
         };
         
-        let rct = Rect::from_pos_size(Vec2::zero(), self.size().to_pixels(1.0));
+        let size = self.size().to_pixels(1.0);
         
         let circle = |r| {
-            let radius = 15.0;
+            let radius = 6.0;
             
-            let s = rct.size() / 2.0 - Vec2::new(radius,radius) * 1.5;
+            let s = size / 2.0 - Vec2::xy(radius + 3.0);
             
             let offset = match r {
                 x if x < 0.25 => s,
@@ -238,13 +330,10 @@ impl Widget for Button {
                 _ => s * Vec2::new(1.0,-1.0),
             };
             
-            Vec2::pol(radius, r * std::f32::consts::PI * 2.0) + rct.mid() + offset
+            Vec2::pol(radius, r * std::f32::consts::PI * 2.0) + size / 2.0 + offset
         };
         
-        builder.add_clr_convex(circle, c, 42);
-        builder.offset.z += 0.005;
-        builder.add_text(self.text.clone(), "sans-serif".to_owned(), rct);
-        builder.offset.z -= 0.005;
+        builder.add_clr_convex(circle, c, 37, true);
     }
     fn on_release(&mut self) -> EventResponse {
         println!("Button {} was clicked!", self.text);
