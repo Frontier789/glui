@@ -11,7 +11,7 @@ impl ShaderCompileErr {
         ShaderCompileErr{details: compile_msg}
     }
     
-    pub fn details(&self) -> &String {
+    pub fn details(&self) -> &str {
         &self.details
     }
 }

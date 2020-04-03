@@ -73,7 +73,7 @@ impl FontLoader {
     pub fn all_families(&self) -> Vec<String> {
         self.fkit_srouce.all_families().unwrap()
     }
-    fn to_family_name(&self, name: String) -> Result<font_kit::handle::Handle, SelectionError> {
+    fn to_family_name(&self, name: &str) -> Result<font_kit::handle::Handle, SelectionError> {
         let props = Properties::new();
         let fkit_name = if name == "serif".to_owned() {
             FamilyName::Serif
@@ -84,7 +84,7 @@ impl FontLoader {
         } else if name == "cursive".to_owned() {
             FamilyName::Cursive
         } else {
-            FamilyName::Title(name.clone())
+            FamilyName::Title(name.to_owned())
         };
         let mut result = self.fkit_srouce.select_best_match(&[fkit_name], &props);
         if let Err(_) = result {
@@ -101,7 +101,7 @@ impl FontLoader {
         result
     }
     pub fn font_file(&mut self, name: &str) -> Option<String> {
-        let name = name.to_lowercase();
+        let name = &name.to_lowercase();
         let result = self.to_family_name(name);
         match result {
             Ok(Handle::Path { path, .. }) => Some(path.to_str().unwrap().to_owned()),
@@ -115,23 +115,23 @@ impl FontLoader {
     }
     
     pub fn font_family<'a>(&'a mut self, name: &str) -> Result<&'a mut Font, FontLoaderError> {
-        let name = name.to_lowercase();
-        if self.name_cache.contains_key(&name) {
-            let entry = &self.name_cache[&name];
+        let name = &name.to_lowercase();
+        if self.name_cache.contains_key(name) {
+            let entry = &self.name_cache[name];
             return Ok(self.font_cache.get_mut(entry).unwrap());
         }
         
-        if self.mem_cache.contains_key(&name) {
-            return Ok(self.mem_cache.get_mut(&name).unwrap());
+        if self.mem_cache.contains_key(name) {
+            return Ok(self.mem_cache.get_mut(name).unwrap());
         }
     
-        let result = self.to_family_name(name.clone());
+        let result = self.to_family_name(name);
         match result {
             Ok(p) => {
                 let font = match p {
                     Handle::Path { path, font_index } => {
                         if self.font_cache.contains_key(&(path.clone(), font_index as usize)) {
-                            self.name_cache.insert(name, (path.clone(), font_index as usize));
+                            self.name_cache.insert(name.clone(), (path.clone(), font_index as usize));
                             return Ok(self.font_cache.get_mut(&(path, font_index as usize)).unwrap());
                         } else {
                             if !self.file_cache.contains_key(&path) {
@@ -152,7 +152,7 @@ impl FontLoader {
                         let font = Font::from_collection(&collection, font_index as usize)?;
                         
                         self.mem_cache.insert(name.clone(), font);
-                        self.mem_cache.get_mut(&name).unwrap()
+                        self.mem_cache.get_mut(name).unwrap()
                     }
                 };
                 
@@ -162,9 +162,9 @@ impl FontLoader {
         }
     }
     pub fn font_exists(&mut self, name: &str) -> bool {
-        let name = name.to_lowercase();
+        let name = &name.to_lowercase();
         
-        self.name_cache.contains_key(&name) || self.mem_cache.contains_key(&name) || self.to_family_name(name.clone()).is_ok()
+        self.name_cache.contains_key(name) || self.mem_cache.contains_key(name) || self.to_family_name(name).is_ok()
     }
 }
 
@@ -263,6 +263,7 @@ impl Font {
             if let Some(bb) = glyph.pixel_bounding_box() {
                 if bb.max.x > size.x as i32 {
                     caret = rusttype::point(0.0, caret.y + advance_height);
+                    row_widths.push(0.0);
                     glyph.set_position(caret);
                     last_glyph_id = None;
                 }
@@ -335,10 +336,12 @@ impl Font {
         let mut bb_rects = Vec::<Rect>::with_capacity(glyphs.len());
         
         for g in glyphs {
-            let (uv,bb) = cache.rect_for(0, &g).unwrap().unwrap();
+            let opt_rect = cache.rect_for(0, &g).unwrap();
             
-            uv_rects.push(Rect{left: uv.min.x, right: uv.max.x, top: uv.min.y, bottom: uv.max.y, });
-            bb_rects.push(Rect{left: bb.min.x as f32, right: bb.max.x as f32, top: bb.min.y as f32, bottom: bb.max.y as f32, });
+            if let Some((uv,bb)) = opt_rect {
+                uv_rects.push(Rect{left: uv.min.x, right: uv.max.x, top: uv.min.y, bottom: uv.max.y, });
+                bb_rects.push(Rect{left: bb.min.x as f32, right: bb.max.x as f32, top: bb.min.y as f32, bottom: bb.max.y as f32, });
+            }
         }
         
         (bb_rects, uv_rects)

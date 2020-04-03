@@ -1,8 +1,8 @@
 use crate::downcast_rs::Downcast;
 
 use super::DrawBuilder;
+use super::CallbackExecutor;
 use tools::*;
-use super::WidgetTreeToList;
 
 #[derive(Copy, Clone)]
 pub enum WidgetSize {
@@ -54,16 +54,16 @@ pub trait Widget: Downcast {
         None
     }
 
-    fn on_press(&mut self) -> EventResponse {
+    fn on_press(&mut self, _executor: &mut CallbackExecutor) -> EventResponse {
         EventResponse::Pass
     }
-    fn on_release(&mut self) -> EventResponse {
+    fn on_release(&mut self, _executor: &mut CallbackExecutor) -> EventResponse {
         EventResponse::Pass
     }
-    fn on_cursor_enter(&mut self) -> EventResponse {
+    fn on_cursor_enter(&mut self, _executor: &mut CallbackExecutor) -> EventResponse {
         EventResponse::Pass
     }
-    fn on_cursor_leave(&mut self) -> EventResponse {
+    fn on_cursor_leave(&mut self, _executor: &mut CallbackExecutor) -> EventResponse {
         EventResponse::Pass
     }
     

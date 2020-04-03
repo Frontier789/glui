@@ -1,4 +1,5 @@
 use super::*;
+use std::f32::consts::PI;
 
 #[derive(Default)]
 pub struct VertLayoutPriv {
@@ -213,7 +214,7 @@ impl Widget for Padding {
     }
 
     fn place_child(&mut self, _child_size: Vec2px) -> Vec2px {
-        Vec2px::new(self.left + self.right, self.top + self.bottom)
+        Vec2px::new(self.left, self.top)
     }
 }
 
@@ -252,7 +253,7 @@ impl Widget for Text {
         self.private.real_size
     }
     fn on_draw_build(&self, builder: &mut DrawBuilder) {
-        builder.add_text(self.text.clone(), self.font.clone(), self.size().to_pixels(1.0), self.color, self.align);
+        builder.add_text(&self.text, &self.font, self.size().to_pixels(1.0), self.color, self.align);
     }
 }
 
@@ -268,6 +269,14 @@ impl Default for ButtonState {
     }
 }
 
+#[derive(PartialEq)]
+pub enum ButtonBckg {
+    None,
+    Fill(Vec4),
+    RoundRect(Vec4,f32),
+    Cirlce(Vec4),
+}
+
 #[derive(Default)]
 pub struct ButtonPrivate {
     state: ButtonState,
@@ -279,6 +288,8 @@ pub struct Button {
     pub text: String,
     pub text_color: Vec4,
     pub font: String,
+    pub background: ButtonBckg,
+    pub callback: GuiCallback,
     pub private: ButtonPrivate,
 }
 
@@ -289,6 +300,8 @@ impl Default for Button {
             text: Default::default(),
             text_color: Vec4::WHITE,
             font: Default::default(),
+            background: ButtonBckg::Fill(Vec4::grey(0.1)),
+            callback: Default::default(),
             private: Default::default(),
         }
     }
@@ -310,45 +323,72 @@ impl Widget for Button {
         })]
     }
     fn on_draw_build(&self, builder: &mut DrawBuilder) {
-        let c = match self.private.state {
-            ButtonState::Normal => Vec4::from_bytes(37,37,38,255),
-            ButtonState::Hovered => Vec4::from_bytes(42, 45, 46, 255),
-            ButtonState::Pressed => Vec4::from_bytes(55, 55, 61, 255),
+        let clr = match self.background {
+            ButtonBckg::Cirlce(c) => c,
+            ButtonBckg::Fill(c) => c,
+            ButtonBckg::RoundRect(c,_r) => c,
+            ButtonBckg::None => {
+                return;
+            }
+        };
+        
+        let intensity = clr.intensity();
+        let bckg_clr_direction = if intensity < 0.5 {Vec4::WHITE} else {Vec4::BLACK};
+        
+        let bckg_clr = match self.private.state {
+            ButtonState::Normal => clr,
+            ButtonState::Hovered => clr * Vec4::grey(0.9) + bckg_clr_direction * Vec4::grey(0.1),
+            ButtonState::Pressed => clr * Vec4::grey(0.95) + bckg_clr_direction * Vec4::grey(0.05),
         };
         
         let size = self.size().to_pixels(1.0);
         
-        let circle = |r| {
-            let radius = 6.0;
-            
-            let s = size / 2.0 - Vec2::xy(radius + 3.0);
-            
-            let offset = match r {
-                x if x < 0.25 => s,
-                x if x < 0.5 => s * Vec2::new(-1.0,1.0),
-                x if x < 0.75 => s * Vec2::new(-1.0,-1.0),
-                _ => s * Vec2::new(1.0,-1.0),
-            };
-            
-            Vec2::pol(radius, r * std::f32::consts::PI * 2.0) + size / 2.0 + offset
-        };
-        
-        builder.add_clr_convex(circle, c, 37, true);
+        match self.background {
+            ButtonBckg::Cirlce(_) => {
+                let radius = size.minxy();
+                let offset = size / 2.0;
+                let cirlce = |r| {
+                    Vec2::pol(radius, r * PI * 2.0) + size / 2.0 + offset
+                };
+                
+                builder.add_clr_convex(cirlce, bckg_clr, (radius * 2.0 * PI).floor() as usize, true);
+            },
+            ButtonBckg::Fill(_) => {
+                builder.add_clr_rect(Rect::from_min_max(Vec2::origin(), size), bckg_clr);
+            },
+            ButtonBckg::RoundRect(_,radius) => {
+                let round_rect = |r| {
+                    let s = size / 2.0 - Vec2::new_xy(radius);
+                    
+                    let circle_mid = size / 2.0 + match r {
+                        x if x < 0.25 => s,
+                        x if x < 0.5 => s * Vec2::new(-1.0,1.0),
+                        x if x < 0.75 => s * Vec2::new(-1.0,-1.0),
+                        _ => s * Vec2::new(1.0,-1.0),
+                    };
+                    
+                    Vec2::pol(radius, r * PI * 2.0) + circle_mid
+                };
+                
+                builder.add_clr_convex(round_rect, bckg_clr, (radius * 2.0 * PI).floor() as usize, true);
+            },
+            ButtonBckg::None => {}
+        }
     }
-    fn on_release(&mut self) -> EventResponse {
-        println!("Button {} was clicked!", self.text);
+    fn on_release(&mut self, executor: &mut CallbackExecutor) -> EventResponse {
+        executor.execute(&self.callback);
         self.private.state = ButtonState::Hovered;
         EventResponse::HandledRedraw
     }
-    fn on_press(&mut self) -> EventResponse {
+    fn on_press(&mut self, _executor: &mut CallbackExecutor) -> EventResponse {
         self.private.state = ButtonState::Pressed;
         EventResponse::HandledRedraw
     }
-    fn on_cursor_enter(&mut self) -> EventResponse {
+    fn on_cursor_enter(&mut self, _executor: &mut CallbackExecutor) -> EventResponse {
         self.private.state = ButtonState::Hovered;
         EventResponse::HandledRedraw
     }
-    fn on_cursor_leave(&mut self) -> EventResponse {
+    fn on_cursor_leave(&mut self, _executor: &mut CallbackExecutor) -> EventResponse {
         self.private.state = ButtonState::Normal;
         EventResponse::HandledRedraw
     }

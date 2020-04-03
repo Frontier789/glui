@@ -25,7 +25,7 @@ impl Vec2 {
         Self{x:x, y:y}
     }
     
-    pub fn xy(xy: f32) -> Self {
+    pub fn new_xy(xy: f32) -> Self {
         Self{x:xy, y:xy}
     }
     

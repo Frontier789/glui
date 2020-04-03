@@ -197,15 +197,12 @@ impl<'a> DrawBuilder<'a> {
         
         let id_to_p = |&i| {
             Vec3::from_vec2(
-                
                 if i < n {
                     let normal: Vec2 = norm[i];
                     
-                    pts[i] - normal * 0.8
+                    pts[i] - normal * (normal.unsign().minxy() * 1.1 + 0.8)
                 } else {
-                    let normal: Vec2 = norm[i-n];
-                    
-                    pts[i-n] + normal * normal.unsign().minxy() * 1.1
+                    pts[i-n]
                 },
                 0.0,
             )
@@ -254,7 +251,7 @@ impl<'a> DrawBuilder<'a> {
     pub fn add_clr_rect(&mut self, rct: Rect, clr: Vec4) {
         self.objects.push(DrawObject {
             pts: offset(rct.triangulate_3d(), self.offset),
-            clr: DrawColor::Default,
+            clr: DrawColor::Const(clr),
             tpt: None,
             tex: None,
             transparent: clr.w < 1.0,
@@ -269,7 +266,7 @@ impl<'a> DrawBuilder<'a> {
             transparent: false,
         })
     }
-    pub fn add_text(&mut self, text: String, font: String, size: Vec2, clr: Vec4, align: font::Align) {
+    pub fn add_text(&mut self, text: &str, font: &str, size: Vec2, clr: Vec4, align: font::Align) {
         let font = self.draw_resources.fonts.font_family(&font).unwrap();
         let (bb_rects, uv_rects) = font.layout_paragraph(
             &text,

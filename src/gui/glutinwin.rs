@@ -60,7 +60,7 @@ impl GlutinWindow {
         gl_window
     }
     
-    pub fn create_window(size: Vec2, title: String, event_loop: &GlutinEventLoop) -> GlutinGLWindowNC {
+    pub fn create_window(size: Vec2, title: &str, event_loop: &GlutinEventLoop) -> GlutinGLWindowNC {
         let window_builder = glutin::window::WindowBuilder::new()
             .with_title(title)
             .with_inner_size(glutin::dpi::LogicalSize::new(size.x, size.y))
@@ -71,7 +71,7 @@ impl GlutinWindow {
             .unwrap()
     }
     
-    pub fn new(size: Vec2, title: String, bgcolor: Vec3) -> Self {
+    pub fn new(size: Vec2, title: &str, bgcolor: Vec3) -> Self {
         let event_loop = glutin::event_loop::EventLoop::new();
         
         let gl_window = Self::prepare_gl(Self::create_window(size, title, &event_loop), bgcolor);

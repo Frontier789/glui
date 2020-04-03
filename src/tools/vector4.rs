@@ -20,6 +20,14 @@ impl Vec4 {
             w: 1.0,
         }
     }
+    pub fn grey(xyz: f32) -> Vec4 {
+        Vec4 {
+            x: xyz,
+            y: xyz,
+            z: xyz,
+            w: 1.0,
+        }
+    }
 
     pub fn from_vec3(xyz: Vec3, w: f32) -> Vec4 {
         Vec4 {
@@ -55,6 +63,9 @@ impl Vec4 {
     }
     pub fn dot(&self, v: Vec4) -> f32 {
         self.x * v.x + self.y * v.y + self.z * v.z
+    }
+    pub fn intensity(&self) -> f32 {
+        self.x * 0.299 + self.y * 0.587 + self.z * 0.144
     }
 
     pub const WHITE: Vec4 = Vec4 {

@@ -73,6 +73,10 @@ impl Vec3 {
             z: self.x*v.y - self.y*v.x,
         }
     }
+    
+    pub fn intensity(&self) -> f32 {
+        self.x * 0.299 + self.y * 0.587 + self.z * 0.144
+    }
 }
 
 // A op B

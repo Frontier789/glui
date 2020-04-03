@@ -1,11 +1,12 @@
 use gl::types::*;
 use std::cell::Cell;
+use std::time::Duration;
 
 #[derive(Copy,Clone,Eq,PartialEq)]
 enum State {
     Running,
     Stopped,
-    HasTime(i64),
+    HasTime(Duration),
 }
 
 pub struct GPUClock {
@@ -37,8 +38,10 @@ impl GPUClock {
         self.state = Cell::new(State::Running);
     }
     fn impl_stop(&self) {
-        unsafe {
-            gl::EndQuery(gl::TIME_ELAPSED);
+        if self.state.get() == State::Running {
+            unsafe {
+                gl::EndQuery(gl::TIME_ELAPSED);
+            }
         }
         self.state.replace(State::Stopped);
     }
@@ -56,7 +59,7 @@ impl GPUClock {
         }
         available > 0
     }
-    pub fn time(&self) -> i64 {
+    pub fn time(&self) -> Duration {
         if let State::HasTime(t) = self.state.get() {
             return t;
         }
@@ -70,7 +73,10 @@ impl GPUClock {
             gl::GetQueryObjectui64v(self.id, gl::QUERY_RESULT, &mut result);
         }
         
-        self.state.replace(State::HasTime(result as i64));
-        result as i64
+        let t = Duration::from_nanos(result as u64);
+        
+        self.state.replace(State::HasTime(t));
+        
+        t
     }
 }
