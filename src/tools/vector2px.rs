@@ -2,7 +2,7 @@ extern crate num;
 
 use std::ops::{Add,Sub,Mul,Div,AddAssign,SubAssign,MulAssign,DivAssign,Neg};
 
-#[derive(Copy,Clone,Debug,Default,PartialEq)]
+#[derive(Copy,Clone,Debug,Default,PartialEq,Add,Sub,Mul,Div,AddAssign,SubAssign,MulAssign,DivAssign,Neg)]
 pub struct Vec2px {
     pub x: f32,
     pub y: f32
@@ -59,88 +59,6 @@ impl Vec2px {
         self.x / self.y
     }
 }
-
-// A op B
-
-impl Add for Vec2px {
-    type Output = Vec2px;
-
-    fn add(self, other: Vec2px) -> Vec2px {
-        Vec2px {
-            x: self.x + other.x,
-            y: self.y + other.y
-        }
-    }
-}
-
-impl Sub for Vec2px {
-    type Output = Vec2px;
-
-    fn sub(self, other: Vec2px) -> Vec2px {
-        Vec2px {
-            x: self.x - other.x,
-            y: self.y - other.y
-        }
-    }
-}
-
-impl Mul for Vec2px {
-    type Output = Vec2px;
-
-    fn mul(self, other: Vec2px) -> Vec2px {
-        Vec2px {
-            x: self.x * other.x,
-            y: self.y * other.y
-        }
-    }
-}
-
-impl Div for Vec2px {
-    type Output = Vec2px;
-
-    fn div(self, other: Vec2px) -> Vec2px {
-        Vec2px {
-            x: self.x / other.x,
-            y: self.y / other.y
-        }
-    }
-}
-
-// A op= B
-
-impl AddAssign for Vec2px {
-
-    fn add_assign(&mut self, other: Vec2px) {
-        self.x += other.x;
-        self.y += other.y;
-    }
-}
-
-impl SubAssign for Vec2px {
-
-    fn sub_assign(&mut self, other: Vec2px) {
-        self.x -= other.x;
-        self.y -= other.y;
-    }
-}
-
-impl MulAssign for Vec2px {
-
-    fn mul_assign(&mut self, other: Vec2px) {
-        self.x *= other.x;
-        self.y *= other.y;
-    }
-}
-
-impl DivAssign for Vec2px {
-
-    fn div_assign(&mut self, other: Vec2px) {
-        self.x /= other.x;
-        self.y /= other.y;
-    }
-}
-
-// A op a
 
 impl Mul<f32> for Vec2px {
     type Output = Vec2px;
@@ -215,20 +133,6 @@ impl DivAssign<i32> for Vec2px {
         self.y /= factor as f32;
     }
 }
-
-// -A
-
-impl Neg for Vec2px {
-    type Output = Vec2px;
-    
-    fn neg(self) -> Vec2px {
-        Vec2px::new(
-            -self.x,
-            -self.y,
-        )
-    }
-}
-
 
 /////////// vec2 - vec2px conversion ///////////
 

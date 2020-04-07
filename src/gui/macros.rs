@@ -41,14 +41,14 @@ macro_rules! register_gui_element_struct_init {
     };
     
     // handle callbacks
-    ( $build_param:ty, $parser:ident, $class:ident { $( $field_in:ident : $value_in:expr ,)* } @ $field_c:ident : move |$param:ident| $body:block $(,)? ) => {
+    ( $build_param:ty, $parser:ident, $class:ident { $( $field_in:ident : $value_in:expr ,)* } @ $field_c:ident : |$param:ident| $body:block $(,)? ) => {
         register_gui_element_struct_init! {
             $build_param, $parser,
             $class { $( $field_in : $value_in ,)* $field_c : $parser::make_callback(move |$param : &mut $build_param| $body) , } @
         }
     };
     
-    ( $build_param:ty, $parser:ident, $class:ident { $( $field_in:ident : $value_in:expr ,)* } @ $field_c:ident : move |$param:ident : $type:ty| $body:block , $( $rest:tt )* ) => {
+    ( $build_param:ty, $parser:ident, $class:ident { $( $field_in:ident : $value_in:expr ,)* } @ $field_c:ident : |$param:ident| $body:block , $( $rest:tt )* ) => {
         register_gui_element_struct_init! (
             $build_param, $parser,
             $class { $( $field_in : $value_in ,)* $field_c : $parser::make_callback(move |$param : &mut $build_param| $body) , } @

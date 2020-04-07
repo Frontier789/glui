@@ -3,7 +3,7 @@ extern crate num;
 use super::vector3::Vec3;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy,Clone,Debug,PartialEq,Add,Sub,Mul,Div,AddAssign,SubAssign,MulAssign,DivAssign)]
 pub struct Vec4 {
     pub x: f32,
     pub y: f32,
@@ -105,100 +105,6 @@ impl Default for Vec4 {
         Vec4::new(0.0, 0.0, 0.0, 1.0)
     }
 }
-
-// A op B
-
-impl Add for Vec4 {
-    type Output = Vec4;
-
-    fn add(self, other: Vec4) -> Vec4 {
-        Vec4 {
-            x: self.x + other.x,
-            y: self.y + other.y,
-            z: self.z + other.z,
-            w: self.w + other.z,
-        }
-    }
-}
-
-impl Sub for Vec4 {
-    type Output = Vec4;
-
-    fn sub(self, other: Vec4) -> Vec4 {
-        Vec4 {
-            x: self.x - other.x,
-            y: self.y - other.y,
-            z: self.z - other.z,
-            w: self.w - other.z,
-        }
-    }
-}
-
-impl Mul for Vec4 {
-    type Output = Vec4;
-
-    fn mul(self, other: Vec4) -> Vec4 {
-        Vec4 {
-            x: self.x * other.x,
-            y: self.y * other.y,
-            z: self.z * other.z,
-            w: self.w * other.z,
-        }
-    }
-}
-
-impl Div for Vec4 {
-    type Output = Vec4;
-
-    fn div(self, other: Vec4) -> Vec4 {
-        Vec4 {
-            x: self.x / other.x,
-            y: self.y / other.y,
-            z: self.z / other.z,
-            w: self.w / other.z,
-        }
-    }
-}
-
-// A op= B
-
-impl AddAssign for Vec4 {
-    fn add_assign(&mut self, other: Vec4) {
-        self.x += other.x;
-        self.y += other.y;
-        self.z += other.z;
-        self.w += other.z;
-    }
-}
-
-impl SubAssign for Vec4 {
-    fn sub_assign(&mut self, other: Vec4) {
-        self.x -= other.x;
-        self.y -= other.y;
-        self.z -= other.z;
-        self.w -= other.z;
-    }
-}
-
-impl MulAssign for Vec4 {
-    fn mul_assign(&mut self, other: Vec4) {
-        self.x *= other.x;
-        self.y *= other.y;
-        self.z *= other.z;
-        self.w *= other.z;
-    }
-}
-
-impl DivAssign for Vec4 {
-    fn div_assign(&mut self, other: Vec4) {
-        self.x /= other.x;
-        self.y /= other.y;
-        self.z /= other.z;
-        self.w /= other.z;
-    }
-}
-
-// A op a
 
 impl Mul<f32> for Vec4 {
     type Output = Vec4;

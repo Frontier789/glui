@@ -1,5 +1,4 @@
 use super::*;
-use crate::ecs::*;
 
 pub type GlutinKey = glutin::event::VirtualKeyCode;
 pub type GlutinButton = glutin::event::MouseButton;
@@ -34,7 +33,6 @@ pub struct GlutinWindow {
     event_loop: glutin::event_loop::EventLoop<()>,
     gl_window: GlutinGLWindow,
     bgcolor: Vec3,
-    pub world: World,
 }
 
 impl GlutinWindow {
@@ -82,9 +80,6 @@ impl GlutinWindow {
             event_loop,
             gl_window,
             bgcolor,
-            world: World {
-                entities: vec![]
-            },
         }
     }
     
@@ -104,9 +99,8 @@ impl GlutinWindow {
         let event_loop = self.event_loop;
         let gl_window = self.gl_window;
         let bgcolor = self.bgcolor;
-        let mut world = self.world;
         
-        event_loop.run(move |event, _, control_flow| {
+        event_loop.run_return(move |event, _, control_flow| {
             *control_flow = glutin::event_loop::ControlFlow::Wait;
     
             match event {
@@ -137,7 +131,7 @@ impl GlutinWindow {
                         _ => (),
                     }
                     
-                    world.handle_event(event);
+                    // world.handle_event(event);
                 },
                 glutin::event::Event::RedrawRequested(..) => {
                     unsafe {
@@ -145,7 +139,7 @@ impl GlutinWindow {
                         gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
                     }
                     
-                    world.render();
+                    // world.render();
                     
                     gl_window.swap_buffers().unwrap();
                 }
@@ -155,5 +149,23 @@ impl GlutinWindow {
                 _ => (),
             }
         });
+    }
+}
+
+impl From<glutin::dpi::PhysicalSize<u32>> for Vec2 {
+    fn from(s: glutin::dpi::PhysicalSize<u32>) -> Vec2 {
+        Vec2::new(s.width as f32, s.height as f32)
+    }
+}
+
+impl From<glutin::dpi::PhysicalPosition<f64>> for Vec2 {
+    fn from(p: glutin::dpi::PhysicalPosition<f64>) -> Vec2 {
+        Vec2::new(p.x as f32, p.y as f32)
+    }
+}
+
+impl From<glutin::dpi::PhysicalPosition<i32>> for Vec2 {
+    fn from(p: glutin::dpi::PhysicalPosition<i32>) -> Vec2 {
+        Vec2::new(p.x as f32, p.y as f32)
     }
 }

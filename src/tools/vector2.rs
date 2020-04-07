@@ -2,7 +2,7 @@ extern crate num;
 
 use std::ops::{Add,Sub,Mul,Div,AddAssign,SubAssign,MulAssign,DivAssign,Neg};
 
-#[derive(Copy,Clone,Debug,Default,PartialEq)]
+#[derive(Copy,Clone,Debug,Default,PartialEq,Add,Sub,Mul,Div,AddAssign,SubAssign,MulAssign,DivAssign,Neg)]
 pub struct Vec2 {
     pub x: f32,
     pub y: f32
@@ -83,88 +83,6 @@ impl Vec2 {
     }
 }
 
-// A op B
-
-impl Add for Vec2 {
-    type Output = Vec2;
-
-    fn add(self, other: Vec2) -> Vec2 {
-        Vec2 {
-            x: self.x + other.x,
-            y: self.y + other.y
-        }
-    }
-}
-
-impl Sub for Vec2 {
-    type Output = Vec2;
-
-    fn sub(self, other: Vec2) -> Vec2 {
-        Vec2 {
-            x: self.x - other.x,
-            y: self.y - other.y
-        }
-    }
-}
-
-impl Mul for Vec2 {
-    type Output = Vec2;
-
-    fn mul(self, other: Vec2) -> Vec2 {
-        Vec2 {
-            x: self.x * other.x,
-            y: self.y * other.y
-        }
-    }
-}
-
-impl Div for Vec2 {
-    type Output = Vec2;
-
-    fn div(self, other: Vec2) -> Vec2 {
-        Vec2 {
-            x: self.x / other.x,
-            y: self.y / other.y
-        }
-    }
-}
-
-// A op= B
-
-impl AddAssign for Vec2 {
-
-    fn add_assign(&mut self, other: Vec2) {
-        self.x += other.x;
-        self.y += other.y;
-    }
-}
-
-impl SubAssign for Vec2 {
-
-    fn sub_assign(&mut self, other: Vec2) {
-        self.x -= other.x;
-        self.y -= other.y;
-    }
-}
-
-impl MulAssign for Vec2 {
-
-    fn mul_assign(&mut self, other: Vec2) {
-        self.x *= other.x;
-        self.y *= other.y;
-    }
-}
-
-impl DivAssign for Vec2 {
-
-    fn div_assign(&mut self, other: Vec2) {
-        self.x /= other.x;
-        self.y /= other.y;
-    }
-}
-
-// A op a
-
 impl Mul<f32> for Vec2 {
     type Output = Vec2;
 
@@ -236,19 +154,6 @@ impl DivAssign<i32> for Vec2 {
     fn div_assign(&mut self, factor: i32) {
         self.x /= factor as f32;
         self.y /= factor as f32;
-    }
-}
-
-// -A
-
-impl Neg for Vec2 {
-    type Output = Vec2;
-    
-    fn neg(self) -> Vec2 {
-        Vec2::new(
-            -self.x,
-            -self.y,
-        )
     }
 }
 

@@ -2,6 +2,7 @@ use super::*;
 use std::collections::HashMap;
 use std::time::Duration;
 use std::time::Instant;
+use std::io::Write;
 
 pub struct Profiler {
     times: HashMap<String, Vec<Duration>>,
@@ -54,5 +55,18 @@ impl Profiler {
         if !enabled {
             self.gpuclock.stop();
         }
+    }
+    pub fn enabled(&self) -> bool {
+        self.enabled
+    }
+    pub fn print(&self, file: &mut std::fs::File) -> std::io::Result<()> {
+        for entry in &self.times {
+            write!(file,"{}: [",entry.0)?;
+            for t in entry.1 {
+                write!(file,"{},",t.as_micros())?;
+            }
+            write!(file,"]\n")?;
+        }
+        Ok(())
     }
 }

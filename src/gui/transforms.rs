@@ -67,6 +67,7 @@ thread_local! {
 pub struct WidgetParser {
     output: Option<WidgetList>,
     callbacks: HashMap<usize, Box<dyn Fn(&mut dyn Any)>>,
+    next_callback_id: usize,
 }
 
 impl WidgetParser {
@@ -138,7 +139,10 @@ impl WidgetParser {
         
         WIDGETPARSER_INSTANCE.with(|widget_parser| {
             let mut widget_parser = widget_parser.borrow_mut();
-            id = widget_parser.callbacks.len();
+            
+            id = widget_parser.next_callback_id;
+            widget_parser.next_callback_id += 1;
+            
             widget_parser.callbacks.insert(id, Box::new(move |input: &mut dyn Any|{
                 f(input.downcast_mut().unwrap());
             }));
@@ -148,7 +152,7 @@ impl WidgetParser {
             callback_id: Some(id),
         }
     }
-    pub fn remove_callback(cb: GuiCallback)
+    pub fn remove_callback(cb: &GuiCallback)
     {
         if let Some(id) = cb.callback_id {
             WIDGETPARSER_INSTANCE.with(|widget_parser| {
@@ -173,6 +177,12 @@ impl WidgetParser {
 #[derive(Default)]
 pub struct GuiCallback {
     callback_id: Option<usize>,
+}
+
+impl Drop for GuiCallback {
+    fn drop(&mut self) {
+        WidgetParser::remove_callback(self);
+    }
 }
 
 pub struct CallbackExecutor<'a> {

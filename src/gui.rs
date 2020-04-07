@@ -8,7 +8,7 @@ pub mod glutinwin;
 pub mod transforms;
 pub mod widget;
 
-pub use self::context::GuiContext;
+// pub use self::context::GuiContext;
 pub use self::draw::DrawBuilder;
 pub use self::draw::DrawResources;
 pub use self::draw::RenderSequence;
