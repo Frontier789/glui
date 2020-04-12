@@ -6,9 +6,6 @@
 // extern crate image;
 
 // #[macro_use]
-// extern crate downcast_rs;
-
-// #[macro_use]
 // mod gui;
 // mod mecs;
 // mod tools;
@@ -39,7 +36,7 @@
 // // toggle button element
 // // Selector element
 // // Touch handling
-// // Tab and anter for active element
+// // Tab and enter for active element
 // // 
 
 // #[derive(Clone,Debug,PartialEq)]
@@ -114,16 +111,12 @@
 //     win.world.add_entity(Box::new(cont));
 //     win.run(GuiWinProps::quick_tester());
 // }
+#![allow(dead_code)]
 
-// macro_rules! match_downcast {
-//     ( $any:expr, { $( $bind:ident : $ty:ty => $arm:expr ),*, _ => $default:expr } ) => {
-         
-//     };
-// }
+extern crate glutin;
 
-#[macro_use]
-extern crate downcast_rs;
 mod mecs;
+mod tools;
 use mecs::*;
 
 #[derive(Component,Debug)]
@@ -136,44 +129,15 @@ struct Print {}
 impl Message for Print {}
 
 #[derive(Debug)]
-struct PrintTimes {pub times: i32,}
+struct PrintTimes(u32);
 impl Message for PrintTimes {}
 
 struct Printer {
     
 }
 
-#[macro_export]
-macro_rules! match_downcast {
-    ( $any:ident { _ : $ty0:ty => $arm0:expr, $($rest:tt)* } ) => (
-        if $any.is::<$ty0>() {
-            $arm0
-        } else {
-            match_downcast!( $any { $( $rest )* } )
-        }
-    );
-    // ( $any:ident { $ty0:ty => $arm0:expr, $($rest:tt)* } ) => (
-    //     if $any.is::<$ty0>() {
-    //         $arm0
-    //     } else {
-    //         match_downcast!( $any { $( $rest )* } )
-    //     }
-    // );
-    ( $any:ident { _ => $default:expr $(,)? } ) => (
-        $default
-    );
-    ( $any:ident { $bind0:ident : $ty0:ty => $arm0:expr, $($rest:tt)* } ) => (
-        if $any.is::<$ty0>() {
-            let $bind0 = $any.downcast::<$ty0>().unwrap();
-            $arm0
-        } else {
-            match_downcast!( $any { $( $rest )* } )
-        }
-    );
-}
-
 impl System for Printer {
-    fn receive(&mut self, msg: Box<dyn Message>, world: &mut World) {
+    fn receive(&mut self, msg: Box<dyn Message>, world: &mut StaticWorld) {
         match_downcast!( msg {
             _ : Print => {
                 let printables = world.entities_with_component::<Printable>();
@@ -185,23 +149,47 @@ impl System for Printer {
                     });
                 }
             },
-            _ => panic!(format!("Printer received unnown msg: {:?}",msg)),
+            PrintTimes(n) if n > 0 => {
+                world.send(SystemId::of::<Printer>(), Print{});
+                world.send(SystemId::of::<Printer>(), PrintTimes(n-1));
+            },
+            PrintTimes(0) => {},
+            _ => panic!(format!("Printer received unknown msg: {:?}",msg)),
         });
         
     }
 }
 
+use std::thread;
+use std::time;
 
 fn main() {
     let mut w: World = World::new();
-    let e = w.named_entity("Gazsi");
-    w.add_component(e, Printable{text: "hy".to_owned()});
-    w.with_component(e,|c: &mut Printable| { c.text += "_2"; });
+    w.add_system(Printer{});
     
-    println!("{}", w.has_component::<Printable>(e));
+    let sw = w.as_static_mut();
     
-    let mut printer = Printer{};
-    printer.receive(Box::new(Print{}), &mut w);
+    let e = sw.entity();
+    sw.add_component(e, Printable{text: "hy".to_owned()});
+    sw.with_component(e,|c: &mut Printable| { c.text += "_2"; });
     
-    w.delete_entity(e);
+    
+    let channel = w.channel();
+    let t = {
+        let channel = channel.clone();
+        thread::spawn(move ||{
+        
+        for _ in 0..5 {
+            thread::sleep(time::Duration::from_millis(1000));
+            
+            channel.send(SystemId::of::<Printer>(), Print{}).unwrap();
+        }
+        channel.send(MessageTarget::None, message::Exit{}).unwrap();
+    })};
+        
+    channel.send(SystemId::of::<Printer>(), PrintTimes(4)).unwrap();
+    
+    w.run();
+    
+    t.join().unwrap();
 }

@@ -1,4 +1,4 @@
-use gl::types::*;
+use super::gl::types::*;
 use super::Buffer;
 use super::GlNum;
 

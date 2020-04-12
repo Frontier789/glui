@@ -1,7 +1,7 @@
 extern crate num;
 
+use super::derive_more::{Add,Sub,Mul,Div,AddAssign,SubAssign,MulAssign,DivAssign};
 use super::vector3::Vec3;
-use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
 
 #[derive(Copy,Clone,Debug,PartialEq,Add,Sub,Mul,Div,AddAssign,SubAssign,MulAssign,DivAssign)]
 pub struct Vec4 {
@@ -106,94 +106,94 @@ impl Default for Vec4 {
     }
 }
 
-impl Mul<f32> for Vec4 {
-    type Output = Vec4;
+// impl Mul<f32> for Vec4 {
+//     type Output = Vec4;
 
-    fn mul(self, factor: f32) -> Vec4 {
-        Vec4 {
-            x: self.x * factor,
-            y: self.y * factor,
-            z: self.z * factor,
-            w: self.w * factor,
-        }
-    }
-}
+//     fn mul(self, factor: f32) -> Vec4 {
+//         Vec4 {
+//             x: self.x * factor,
+//             y: self.y * factor,
+//             z: self.z * factor,
+//             w: self.w * factor,
+//         }
+//     }
+// }
 
-impl Div<f32> for Vec4 {
-    type Output = Vec4;
+// impl Div<f32> for Vec4 {
+//     type Output = Vec4;
 
-    fn div(self, factor: f32) -> Vec4 {
-        Vec4 {
-            x: self.x / factor,
-            y: self.y / factor,
-            z: self.z / factor,
-            w: self.w / factor,
-        }
-    }
-}
+//     fn div(self, factor: f32) -> Vec4 {
+//         Vec4 {
+//             x: self.x / factor,
+//             y: self.y / factor,
+//             z: self.z / factor,
+//             w: self.w / factor,
+//         }
+//     }
+// }
 
-impl Mul<i32> for Vec4 {
-    type Output = Vec4;
+// impl Mul<i32> for Vec4 {
+//     type Output = Vec4;
 
-    fn mul(self, factor: i32) -> Vec4 {
-        Vec4 {
-            x: self.x * factor as f32,
-            y: self.y * factor as f32,
-            z: self.z * factor as f32,
-            w: self.w * factor as f32,
-        }
-    }
-}
+//     fn mul(self, factor: i32) -> Vec4 {
+//         Vec4 {
+//             x: self.x * factor as f32,
+//             y: self.y * factor as f32,
+//             z: self.z * factor as f32,
+//             w: self.w * factor as f32,
+//         }
+//     }
+// }
 
-impl Div<i32> for Vec4 {
-    type Output = Vec4;
+// impl Div<i32> for Vec4 {
+//     type Output = Vec4;
 
-    fn div(self, factor: i32) -> Vec4 {
-        Vec4 {
-            x: self.x / factor as f32,
-            y: self.y / factor as f32,
-            z: self.z / factor as f32,
-            w: self.w / factor as f32,
-        }
-    }
-}
+//     fn div(self, factor: i32) -> Vec4 {
+//         Vec4 {
+//             x: self.x / factor as f32,
+//             y: self.y / factor as f32,
+//             z: self.z / factor as f32,
+//             w: self.w / factor as f32,
+//         }
+//     }
+// }
 
-// A op= a
+// // A op= a
 
-impl MulAssign<f32> for Vec4 {
-    fn mul_assign(&mut self, factor: f32) {
-        self.x *= factor;
-        self.y *= factor;
-        self.z *= factor;
-        self.w *= factor;
-    }
-}
+// impl MulAssign<f32> for Vec4 {
+//     fn mul_assign(&mut self, factor: f32) {
+//         self.x *= factor;
+//         self.y *= factor;
+//         self.z *= factor;
+//         self.w *= factor;
+//     }
+// }
 
-impl DivAssign<f32> for Vec4 {
-    fn div_assign(&mut self, factor: f32) {
-        self.x /= factor;
-        self.y /= factor;
-        self.z /= factor;
-        self.w /= factor;
-    }
-}
+// impl DivAssign<f32> for Vec4 {
+//     fn div_assign(&mut self, factor: f32) {
+//         self.x /= factor;
+//         self.y /= factor;
+//         self.z /= factor;
+//         self.w /= factor;
+//     }
+// }
 
-impl MulAssign<i32> for Vec4 {
-    fn mul_assign(&mut self, factor: i32) {
-        self.x *= factor as f32;
-        self.y *= factor as f32;
-        self.z *= factor as f32;
-        self.w *= factor as f32;
-    }
-}
+// impl MulAssign<i32> for Vec4 {
+//     fn mul_assign(&mut self, factor: i32) {
+//         self.x *= factor as f32;
+//         self.y *= factor as f32;
+//         self.z *= factor as f32;
+//         self.w *= factor as f32;
+//     }
+// }
 
-impl DivAssign<i32> for Vec4 {
-    fn div_assign(&mut self, factor: i32) {
-        self.x /= factor as f32;
-        self.y /= factor as f32;
-        self.z /= factor as f32;
-        self.w /= factor as f32;
-    }
-}
+// impl DivAssign<i32> for Vec4 {
+//     fn div_assign(&mut self, factor: i32) {
+//         self.x /= factor as f32;
+//         self.y /= factor as f32;
+//         self.z /= factor as f32;
+//         self.w /= factor as f32;
+//     }
+// }
 
 // pub type Vec4f = Vec4;

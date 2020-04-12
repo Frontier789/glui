@@ -1,5 +1,5 @@
 use super::gltraits::GlNum;
-use gl::types::*;
+use super::gl::types::*;
 use std::ffi::c_void;
 use std::marker::PhantomData;
 

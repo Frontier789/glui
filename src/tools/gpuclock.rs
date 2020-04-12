@@ -1,4 +1,4 @@
-use gl::types::*;
+use super::gl::types::*;
 use std::cell::Cell;
 use std::time::Duration;
 

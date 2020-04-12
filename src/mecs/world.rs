@@ -1,96 +1,128 @@
-use super::bimap::BiMap;
-use super::Component;
-use mecs::entity::Entity;
+use super::*;
 use std::collections::HashMap;
+use std::mem::swap;
+use std::sync::mpsc::*;
 
 pub struct World {
-    entities: HashMap<Entity, Vec<Box<dyn Component>>>,
-    names: BiMap<String, Entity>,
-    next_entity_id: usize,
+    static_world: StaticWorld,
+    systems: HashMap<SystemId, Box<dyn System>>,
+    actors: HashMap<ActorId, Box<dyn Actor>>,
+    next_actor_id: usize,
+    loop_data: MessageLoopData,
 }
 
 impl World {
     pub fn new() -> World {
+        let (sender, receiver) = channel();
         World {
-            entities: Default::default(),
-            names: Default::default(),
-            next_entity_id: Default::default(),
+            static_world: Default::default(),
+            systems: Default::default(),
+            actors: Default::default(),
+            next_actor_id: 0,
+            loop_data: MessageLoopData::HandRolled(sender, receiver),
         }
     }
-    
-    pub fn entity(&mut self) -> Entity {
-        let id = self.next_entity_id;
-        self.next_entity_id += 1;
-        
-        let entity = Entity::from_id(id);
-        self.entities.insert(entity,vec![]);
-        
-        entity
+    pub fn as_static(&self) -> &StaticWorld {
+        &self.static_world
     }
-    pub fn named_entity(&mut self, name: &str) -> Entity {
-        match self.names.get_by_left(&name.to_owned()) {
-            Some(&e) => e,
-            None => {
-                let e = self.entity();
-                self.names.insert(name.into(), e);
-                e
-            }
-        }
-    }
-    pub fn delete_entity(&mut self, entity: Entity) {
-        self.entities.remove(&entity);
-        self.names.remove_by_right(&entity);
+    pub fn as_static_mut(&mut self) -> &mut StaticWorld {
+        &mut self.static_world
     }
 
-    pub fn with_component<C,R,F>(&mut self, entity: Entity, mut fun: F) -> Option<R>
+    pub fn add_system<S>(&mut self, system: S) -> SystemId
     where
-        C: Component,
-        F: FnMut(&mut C) -> R,
+        S: System + 'static,
     {
-        if let Some(components) = self.entities.get_mut(&entity) {
-            for c in components {
-                if c.is::<C>() {
-                    return Some(fun(c.downcast_mut::<C>().unwrap()));
+        let id = SystemId::of::<S>();
+        self.systems.insert(id, Box::new(system));
+        id
+    }
+    fn next_actor_id(&mut self) -> ActorId {
+        let id = ActorId(self.next_actor_id);
+        self.next_actor_id += 1;
+        id
+    }
+    pub fn add_actor<A>(&mut self, actor: A) -> ActorId
+    where
+        A: Actor + 'static,
+    {
+        let id = self.next_actor_id();
+        self.actors.insert(id, Box::new(actor));
+        id
+    }
+
+    // pub fn system<S>(&mut self) -> Option<&mut S>
+    // where
+    //     S: System + 'static,
+    // {
+    //     self.systems.get_mut(&SystemId::of::<S>())
+    // }
+    pub fn deliver_all_messages(&mut self) {
+        while !self.static_world.queued_messages.is_empty() {
+            self.deliver_messages();
+        }
+    }
+    fn deliver_messages(&mut self) {
+        let mut messages = vec![];
+        swap(&mut self.static_world.queued_messages, &mut messages);
+        for msg in messages.drain(0..) {
+            match msg.target {
+                MessageTarget::System(id) => {
+                    self.systems
+                        .get_mut(&id)
+                        .expect(&format!("Message {:?} sent to non-existing system!", msg.payload))
+                        .receive(msg.payload, &mut self.static_world);
+                }
+                MessageTarget::Actor(id) => {
+                    self.actors
+                        .get_mut(&id)
+                        .expect(&format!("Message {:?} sent to non-existing actor!", msg.payload))
+                        .receive(msg.payload, &mut self.static_world);
+                }
+                MessageTarget::None => {}
+            }
+        }
+    }
+    pub fn channel(&mut self) -> MessageChannel {
+        match &self.loop_data {
+            MessageLoopData::HandRolled(sender, _receiver) => {
+                MessageChannel::from_sender(sender.clone())
+            }
+            MessageLoopData::Glutin(win) => MessageChannel::from_window(&win),
+            MessageLoopData::Consumed => panic!("Cannot give channel to consumed message loop data!"),
+        }
+    }
+    pub fn run(self) {
+        match self.loop_data {
+            MessageLoopData::HandRolled(_, _) => {
+                self.run_msg_loop();
+            }
+            MessageLoopData::Glutin(win) => {
+                win.run(GuiWinProps::tester());
+            }
+            MessageLoopData::Consumed => {}
+        }
+    }
+    fn run_msg_loop(mut self) {
+        
+        let mut loop_data = MessageLoopData::Consumed;
+        std::mem::swap(&mut loop_data, &mut self.loop_data);
+        
+        if let MessageLoopData::HandRolled(_, receiver) = loop_data {
+            let mut finished = false;
+            while !finished {
+                let msg = receiver.recv().unwrap();
+                println!("msg loop got: {:?}", msg);
+                
+                if msg.target == MessageTarget::None {
+                    if msg.payload.is::<message::Exit>() {
+                        finished = true;
+                    }
+                } else {
+                    self.static_world.send_annotated(msg);
+                    self.deliver_all_messages();
                 }
             }
         }
-        None
-    }
-    
-    pub fn has_component<C>(&self, entity: Entity) -> bool
-    where
-        C: Component,
-    {
-        if let Some(components) = self.entities.get(&entity) {
-            for c in components {
-                if c.is::<C>() {
-                    return true;
-                }
-            }
-        }
-        false
-    }
-    
-    pub fn add_component<C>(&mut self, entity: Entity, component: C)
-    where
-        C: Component,
-    {
-        if let Some(components) = self.entities.get_mut(&entity) {
-            components.push(Box::new(component));
-        }
-    }
-    
-    pub fn entities_with_component<C>(&mut self) -> Vec<Entity>
-    where
-        C: Component,
-    {
-        let me = &*self;
-        me.entities.iter().filter_map(|(&k,_)|{
-            if me.has_component::<C>(k) {
-                Some(k)
-            } else {
-                None
-            }
-        }).collect()
     }
 }

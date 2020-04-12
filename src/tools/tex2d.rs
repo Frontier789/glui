@@ -2,9 +2,9 @@ extern crate gl;
 extern crate image;
 
 use super::Vec2;
-use gl::types::*;
-use image::io::Reader;
-use image::GenericImageView;
+use super::gl::types::*;
+use super::image::io::Reader;
+use super::image::GenericImageView;
 
 pub trait Texture {
     fn id(&self) -> u32;
@@ -18,7 +18,7 @@ pub struct RgbaTexture {
     height: usize,
 }
 
-use image::ConvertBuffer;
+use super::image::ConvertBuffer;
 
 impl Texture for RgbaTexture {
     fn id(&self) -> u32 {

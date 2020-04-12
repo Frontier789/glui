@@ -1,4 +1,4 @@
-use gl::types::*;
+use super::gl::types::*;
 use std::fmt;
 
 #[derive(Copy, Clone)]

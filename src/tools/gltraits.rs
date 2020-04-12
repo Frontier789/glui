@@ -7,7 +7,7 @@ use super::vector3::Vec3;
 use super::vector4::Vec4;
 use std::collections::HashMap;
 
-use gl::types::*;
+use super::gl::types::*;
 
 /// Trait for types that can be stored in a buffer
 pub trait GlNum: Clone + Copy {
