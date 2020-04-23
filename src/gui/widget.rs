@@ -1,4 +1,6 @@
-use crate::downcast_rs::Downcast;
+extern crate downcast_rs;
+use self::downcast_rs::Downcast;
+use self::downcast_rs::impl_downcast;
 
 use super::DrawBuilder;
 use super::CallbackExecutor;
@@ -42,13 +44,44 @@ pub enum EventResponse {
     HandledRedraw,
 }
 
+#[derive(Default, Debug, Copy, Clone)]
+pub struct WidgetPosition {
+    pub pos: Vec2px,
+    pub depth: f32,
+}
+
+impl From<Vec2px> for WidgetPosition {
+    fn from(p: Vec2px) -> WidgetPosition {
+        WidgetPosition {
+            pos: p,
+            depth: 0.01,
+        }
+    }
+}
+
+impl WidgetPosition {
+    pub fn new(pos: Vec2px, depth: f32) -> WidgetPosition {
+        WidgetPosition {
+            pos,
+            depth,
+        }
+    }
+    
+    pub fn to_pixels(self, gui_scale: f32) -> Vec3 {
+        Vec3::from_vec2(
+            self.pos.to_pixels(gui_scale),
+            self.depth,
+        )
+    }
+}
+
 pub trait Widget: Downcast {
     fn constraint(&mut self, _self_constraint: WidgetConstraints) {}
     
     fn expand(&self) -> Vec<Box<dyn Widget>> {vec![]}
 
-    fn place_child(&mut self, _child_size: Vec2px) -> Vec2px {
-        Vec2px::zero()
+    fn place_child(&mut self, _child_size: Vec2px, _child_descent: f32) -> WidgetPosition {
+        Vec2px::zero().into()
     }
     fn child_constraint(&self) -> Option<WidgetConstraints> {
         None

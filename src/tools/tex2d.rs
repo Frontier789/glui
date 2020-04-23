@@ -5,6 +5,7 @@ use super::Vec2;
 use super::gl::types::*;
 use super::image::io::Reader;
 use super::image::GenericImageView;
+use tools::image::buffer::ConvertBuffer;
 
 pub trait Texture {
     fn id(&self) -> u32;
@@ -18,7 +19,6 @@ pub struct RgbaTexture {
     height: usize,
 }
 
-use super::image::ConvertBuffer;
 
 impl Texture for RgbaTexture {
     fn id(&self) -> u32 {

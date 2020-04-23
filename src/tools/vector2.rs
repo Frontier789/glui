@@ -1,8 +1,8 @@
 extern crate num;
 
-use super::derive_more::{Add,Sub,Mul,Div,AddAssign,SubAssign,MulAssign,DivAssign,Neg};
+use std::ops::{Add,Sub,Mul,Div,AddAssign,SubAssign,MulAssign,DivAssign,Neg};
 
-#[derive(Copy,Clone,Debug,Default,PartialEq,Add,Sub,Mul,Div,AddAssign,SubAssign,MulAssign,DivAssign,Neg)]
+#[derive(Copy,Clone,Debug,Default,PartialEq)]
 pub struct Vec2 {
     pub x: f32,
     pub y: f32
@@ -83,78 +83,173 @@ impl Vec2 {
     }
 }
 
-// impl Mul<f32> for Vec2 {
-//     type Output = Vec2;
+// A op B
 
-//     fn mul(self, factor: f32) -> Vec2 {
-//         Vec2 {
-//             x: self.x * factor,
-//             y: self.y * factor
-//         }
-//     }
-// }
+impl Add for Vec2 {
+    type Output = Vec2;
 
-// impl Div<f32> for Vec2 {
-//     type Output = Vec2;
+    fn add(self, other: Vec2) -> Vec2 {
+        Vec2 {
+            x: self.x + other.x,
+            y: self.y + other.y
+        }
+    }
+}
 
-//     fn div(self, factor: f32) -> Vec2 {
-//         Vec2 {
-//             x: self.x / factor,
-//             y: self.y / factor
-//         }
-//     }
-// }
+impl Sub for Vec2 {
+    type Output = Vec2;
 
-// impl Mul<i32> for Vec2 {
-//     type Output = Vec2;
+    fn sub(self, other: Vec2) -> Vec2 {
+        Vec2 {
+            x: self.x - other.x,
+            y: self.y - other.y
+        }
+    }
+}
 
-//     fn mul(self, factor: i32) -> Vec2 {
-//         Vec2 {
-//             x: self.x * factor as f32,
-//             y: self.y * factor as f32
-//         }
-//     }
-// }
+impl Mul for Vec2 {
+    type Output = Vec2;
 
-// impl Div<i32> for Vec2 {
-//     type Output = Vec2;
+    fn mul(self, other: Vec2) -> Vec2 {
+        Vec2 {
+            x: self.x * other.x,
+            y: self.y * other.y
+        }
+    }
+}
 
-//     fn div(self, factor: i32) -> Vec2 {
-//         Vec2 {
-//             x: self.x / factor as f32,
-//             y: self.y / factor as f32
-//         }
-//     }
-// }
+impl Div for Vec2 {
+    type Output = Vec2;
 
-// // A op= a
+    fn div(self, other: Vec2) -> Vec2 {
+        Vec2 {
+            x: self.x / other.x,
+            y: self.y / other.y
+        }
+    }
+}
 
-// impl MulAssign<f32> for Vec2 {
-//     fn mul_assign(&mut self, factor: f32) {
-//         self.x *= factor;
-//         self.y *= factor;
-//     }
-// }
+// A op= B
 
-// impl DivAssign<f32> for Vec2 {
-//     fn div_assign(&mut self, factor: f32) {
-//         self.x /= factor;
-//         self.y /= factor;
-//     }
-// }
+impl AddAssign for Vec2 {
 
-// impl MulAssign<i32> for Vec2 {
-//     fn mul_assign(&mut self, factor: i32) {
-//         self.x *= factor as f32;
-//         self.y *= factor as f32;
-//     }
-// }
+    fn add_assign(&mut self, other: Vec2) {
+        self.x += other.x;
+        self.y += other.y;
+    }
+}
 
-// impl DivAssign<i32> for Vec2 {
-//     fn div_assign(&mut self, factor: i32) {
-//         self.x /= factor as f32;
-//         self.y /= factor as f32;
-//     }
-// }
+impl SubAssign for Vec2 {
+
+    fn sub_assign(&mut self, other: Vec2) {
+        self.x -= other.x;
+        self.y -= other.y;
+    }
+}
+
+impl MulAssign for Vec2 {
+
+    fn mul_assign(&mut self, other: Vec2) {
+        self.x *= other.x;
+        self.y *= other.y;
+    }
+}
+
+impl DivAssign for Vec2 {
+
+    fn div_assign(&mut self, other: Vec2) {
+        self.x /= other.x;
+        self.y /= other.y;
+    }
+}
+
+// A op a
+
+impl Mul<f32> for Vec2 {
+    type Output = Vec2;
+
+    fn mul(self, factor: f32) -> Vec2 {
+        Vec2 {
+            x: self.x * factor,
+            y: self.y * factor
+        }
+    }
+}
+
+impl Div<f32> for Vec2 {
+    type Output = Vec2;
+
+    fn div(self, factor: f32) -> Vec2 {
+        Vec2 {
+            x: self.x / factor,
+            y: self.y / factor
+        }
+    }
+}
+
+impl Mul<i32> for Vec2 {
+    type Output = Vec2;
+
+    fn mul(self, factor: i32) -> Vec2 {
+        Vec2 {
+            x: self.x * factor as f32,
+            y: self.y * factor as f32
+        }
+    }
+}
+
+impl Div<i32> for Vec2 {
+    type Output = Vec2;
+
+    fn div(self, factor: i32) -> Vec2 {
+        Vec2 {
+            x: self.x / factor as f32,
+            y: self.y / factor as f32
+        }
+    }
+}
+
+// A op= a
+
+impl MulAssign<f32> for Vec2 {
+    fn mul_assign(&mut self, factor: f32) {
+        self.x *= factor;
+        self.y *= factor;
+    }
+}
+
+impl DivAssign<f32> for Vec2 {
+    fn div_assign(&mut self, factor: f32) {
+        self.x /= factor;
+        self.y /= factor;
+    }
+}
+
+impl MulAssign<i32> for Vec2 {
+    fn mul_assign(&mut self, factor: i32) {
+        self.x *= factor as f32;
+        self.y *= factor as f32;
+    }
+}
+
+impl DivAssign<i32> for Vec2 {
+    fn div_assign(&mut self, factor: i32) {
+        self.x /= factor as f32;
+        self.y /= factor as f32;
+    }
+}
+
+// -A
+
+impl Neg for Vec2 {
+    type Output = Vec2;
+    
+    fn neg(self) -> Vec2 {
+        Vec2::new(
+            -self.x,
+            -self.y,
+        )
+    }
+}
 
 // pub type Vec2f = Vec2;

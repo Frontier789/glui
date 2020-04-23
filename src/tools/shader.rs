@@ -160,6 +160,7 @@ fn compile(sources: Vec<(&str, ShaderType)>) -> Result<(GLuint, Vec<GLuint>), Sh
     Ok((id, sids))
 }
 
+#[derive(Debug)]
 pub struct DrawShader {
     id: u32,
     sids: Vec<u32>,

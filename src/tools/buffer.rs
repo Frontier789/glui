@@ -3,6 +3,7 @@ use super::gl::types::*;
 use std::ffi::c_void;
 use std::marker::PhantomData;
 
+#[derive(Debug)]
 pub struct Buffer<T: GlNum> {
     id: u32,
     size: usize,

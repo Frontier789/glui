@@ -196,12 +196,18 @@ where
     }
 }
 
-pub fn check_glerr_debug() -> Result<(), &'static str> {
+#[cfg(debug_assertions)]
+pub fn check_glerr_debug() {
     match unsafe { gl::GetError() } {
-        gl::NO_ERROR => Ok(()),
-        e => Err(gl_error_to_str(e)),
+        gl::NO_ERROR => {},
+        e => {
+            panic!("GL error detected: {}", gl_error_to_str(e))
+        }
     }
 }
+
+#[cfg(not(debug_assertions))]
+pub fn check_glerr_debug() {}
 
 pub fn gl_error_to_str(err: GLenum) -> &'static str {
     match err {

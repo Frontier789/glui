@@ -1,0 +1,7 @@
+[package]
+name = "gomoku"
+version = "1.0.0"
+[dependencies]
+rusty = { path = "../.." }
+glui = { path = "../../../glui" }
+rand = "*"

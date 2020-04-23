@@ -11,7 +11,6 @@ use self::rusttype::gpu_cache;
 use self::unicode_normalization::UnicodeNormalization;
 
 use std::collections::HashMap;
-use std::fs::File;
 use std::io::Error as IoError;
 use std::path::PathBuf;
 use std::sync::Arc;

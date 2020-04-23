@@ -1,3 +1,5 @@
+extern crate gl;
+
 #[macro_use]
 pub mod macros;
 pub mod context;
@@ -7,16 +9,21 @@ pub mod font;
 pub mod transforms;
 pub mod widget;
 
-// pub use self::context::GuiContext;
+pub use self::context::GuiContext;
+pub use self::context::PostBox;
 pub use self::draw::DrawBuilder;
 pub use self::draw::DrawResources;
 pub use self::draw::RenderSequence;
-pub use self::draw::RenderTarget;
 pub use self::elements::Button;
 pub use self::elements::ButtonBckg;
 pub use self::elements::FixedPanel;
+pub use self::elements::FontSize;
 pub use self::elements::GridLayout;
+pub use self::elements::Image;
 pub use self::elements::Padding;
+pub use self::elements::PanelDirection;
+pub use self::elements::Square;
+pub use self::elements::Overlay;
 pub use self::elements::Text;
 pub use self::elements::VertLayout;
 pub use self::font::Font;
@@ -24,13 +31,14 @@ pub use self::font::FontLoader;
 pub use self::font::FontLoaderError;
 pub use self::font::HAlign;
 pub use self::font::VAlign;
+pub use self::transforms::CallbackExecutor;
 pub use self::transforms::GuiCallback;
 pub use self::transforms::WidgetLayoutBuilder;
-pub use self::transforms::CallbackExecutor;
 pub use self::transforms::WidgetList;
 pub use self::transforms::WidgetParser;
 pub use self::widget::EventResponse;
 pub use self::widget::Widget;
+pub use self::widget::WidgetPosition;
 pub use self::widget::WidgetConstraints;
 pub use self::widget::WidgetSize;
 pub use super::tools::*;

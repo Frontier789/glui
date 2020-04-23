@@ -1,9 +1,9 @@
 extern crate downcast_rs;
 use self::downcast_rs::impl_downcast;
 use self::downcast_rs::Downcast;
-use actor::*;
+use super::actor::*;
+use super::system::*;
 use std::fmt::Debug;
-use system::*;
 
 pub trait Message: Downcast + Debug + Send {}
 impl_downcast!(Message);

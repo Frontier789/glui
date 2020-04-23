@@ -1,13 +1,7 @@
-use super::GlutinEvent;
 use super::*;
-use crate::mecs::Entity;
-use std::any::Any;
-use std::cell::RefCell;
-use std::rc::Rc;
-use std::time::Instant;
-use std::error::Error;
+use mecs::world::UiEvent;
+use mecs::*;
 use std::fs::File;
-use std::io::prelude::*;
 use std::path::Path;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -17,15 +11,14 @@ enum GrabState {
     GrabbedOutside,
 }
 
-pub struct GuiContext<D>
-{
+pub struct GuiContext<D> {
     render_target: RenderTarget,
     draw_res: DrawResources,
     widgets: Vec<Box<dyn Widget + 'static>>,
     parents: Vec<Option<usize>>,
     widget_graph: Vec<Vec<usize>>,
     widget_depth: Vec<usize>,
-    positions: Vec<Vec2px>,
+    positions: Vec<WidgetPosition>,
     active_widget: Option<usize>,
     cursor_hierarchy: Option<usize>,
     cursor_grabbed: GrabState,
@@ -34,66 +27,43 @@ pub struct GuiContext<D>
     render_dirty: bool,
     profiler: Profiler,
     build_data: D,
-    build_data_mut: D,
+    cb_executor: CallbackExecutor,
     widget_builder: Box<dyn Fn(D)>,
 }
 
-impl<D> Entity for GuiContext<D>
+impl<D> Actor for GuiContext<D>
 where
     D: PartialEq + Clone + 'static,
 {
-    fn handle_event(&mut self, event: &GlutinEvent) {
-        match *event {
-            glutin::event::WindowEvent::Resized(size) => {
-                self.resized(size.into());
-            }
-            glutin::event::WindowEvent::KeyboardInput { input, .. } => {
-                match input.virtual_keycode {
-                    None => (),
-                    Some(key) => {
-                        if input.state == glutin::event::ElementState::Pressed {
-                            self.key_pressed(key);
-                        } else {
-                            self.key_released(key);
+    fn receive(&mut self, msg: Box<dyn Message>, world: &mut StaticWorld) {
+        // println!("context got: {:?}",msg);
+        match_downcast!( msg {
+            ui_event : UiEvent => {
+                match ui_event {
+                    UiEvent::GlutinEvent(ev) => {
+                        self.handle_event(ev);
+                    },
+                    UiEvent::Redraw => {
+                        self.render();
+                    },
+                    UiEvent::EventsCleared => {
+                        self.actualize_data();
+                        if !self.cb_executor.sender.messages.is_empty() {
+                            for message in self.cb_executor.sender.messages.drain(0..) {
+                                world.send_annotated(message);
+                            }
                         }
-                    }
+                    },
                 }
-            }
-            glutin::event::WindowEvent::MouseInput { button, state, .. } => {
-                if state == glutin::event::ElementState::Pressed {
-                    self.button_pressed(button);
-                } else {
-                    self.button_released(button);
-                }
-            }
-            glutin::event::WindowEvent::CursorMoved { position, .. } => {
-                self.cursor_moved(position.into());
-            }
-            glutin::event::WindowEvent::CursorLeft { .. } => {
-                self.cursor_left();
-            }
-            _ => (),
-        }
-        if self.build_data != self.build_data_mut {
-            self.build_data = self.build_data_mut.clone();
-            self.rebuild_gui();
-            self.rebuild_cursor_inside(self.cursor_pos);
-        }
-        if self.render_dirty {
-            self.rebuild_render_seq();
-        }
-    }
-    fn render(&mut self) {
-        let rseq = self.render_seq.as_ref().unwrap();
-        self.profiler.begin_gpu("Draw");
-        rseq.execute(&mut self.draw_res);
-        self.profiler.end_gpu();
+            },
+            _ => {}
+        });
     }
 }
 
 impl<D> GuiContext<D>
 where
-    D: Clone + 'static,
+    D: Clone + 'static + PartialEq,
 {
     pub fn new<F>(
         target: RenderTarget,
@@ -120,7 +90,7 @@ where
             draw_res: DrawResources::new(),
             profiler: Profiler::new(profile),
             build_data: build_data.clone(),
-            build_data_mut: build_data,
+            cb_executor: CallbackExecutor { data: Box::new(build_data), sender: PostBox::new() },
             widget_builder: Box::new(widget_builder),
         }
     }
@@ -132,11 +102,9 @@ where
         let mut builder = DrawBuilder::new(&mut self.draw_res);
         let n = self.widgets.len();
         for i in 0..n {
-            builder.offset = Vec3::from_vec2(
-                self.positions[i].to_pixels(1.0),
-                self.widget_depth[i] as f32 * 0.01,
-            );
+            builder.offset = self.positions[i].to_pixels(1.0);
             self.widgets[i].on_draw_build(&mut builder);
+            // builder.add_clr_rect(Rect::from_pos_size(Vec2::origin(), self.widgets[i].size().to_pixels(1.0)), Vec4::new(1.0,0.0,0.0,0.5));
         }
         self.render_seq = Some(builder.to_render_sequence(&self.render_target));
         self.render_dirty = false;
@@ -144,6 +112,7 @@ where
     }
 
     pub fn rebuild_gui(&mut self) {
+        crate::tools::gltraits::check_glerr_debug();
         self.profiler.begin("Rebuild Gui");
         let widget_builder = &self.widget_builder;
         let widget_list = WidgetParser::produce_list(|| {
@@ -158,7 +127,6 @@ where
             widget_list.widget_graph,
         );
         layout_builder.build(self.render_target.logical_size());
-        layout_builder.make_pos_abs(0, Vec2px::origin());
         self.cursor_hierarchy = None;
         self.widget_graph = layout_builder.widget_graph;
         self.parents = widget_list.parents;
@@ -170,7 +138,7 @@ where
     }
     pub fn resized(&mut self, s: Vec2) {
         self.render_target.size = s;
-        self.rebuild_render_seq();
+        self.rebuild_gui();
     }
     pub fn widget_count(&self) -> usize {
         self.widgets.len()
@@ -179,16 +147,12 @@ where
         if button != GlutinButton::Left {
             return;
         }
-        let mut executor = CallbackExecutor {
-            data: &mut self.build_data_mut
-        };
-        
         match (self.active_widget, self.cursor_grabbed) {
             (_, GrabState::GrabbedOutside) => {
                 self.rebuild_cursor_inside(self.cursor_pos);
             }
             (Some(id), GrabState::GrabbedInside) => {
-                if self.widgets[id].on_release(&mut executor) == EventResponse::HandledRedraw {
+                if self.widgets[id].on_release(&mut self.cb_executor) == EventResponse::HandledRedraw {
                     self.render_dirty = true;
                 }
             }
@@ -200,16 +164,12 @@ where
         if button != GlutinButton::Left {
             return;
         }
-        let mut executor = CallbackExecutor {
-            data: &mut self.build_data_mut
-        };
-        
         match self.cursor_hierarchy {
             Some(mut id) => {
-                let mut result = self.widgets[id].on_press(&mut executor);
+                let mut result = self.widgets[id].on_press(&mut self.cb_executor);
                 while result == EventResponse::Pass {
                     if let Some(parent) = self.parents[id] {
-                        result = self.widgets[parent].on_press(&mut executor);
+                        result = self.widgets[parent].on_press(&mut self.cb_executor);
                         id = parent;
                     } else {
                         break;
@@ -235,21 +195,17 @@ where
     }
     fn point_in_widget(&self, id: usize, p: Vec2) -> bool {
         let scl = self.render_target.gui_scale;
-        let pos = self.positions[id].to_pixels(scl);
+        let pos = self.positions[id].pos.to_pixels(scl);
         let siz = self.widgets[id].size().to_pixels(scl);
         Rect::from_pos_size(pos, siz).contains(p)
     }
     fn fire_enter_leave_event(&mut self, id: usize, enter: bool) {
-        let mut executor = CallbackExecutor {
-            data: &mut self.build_data_mut
-        };
-        
         if enter {
-            if self.widgets[id].on_cursor_enter(&mut executor) == EventResponse::HandledRedraw {
+            if self.widgets[id].on_cursor_enter(&mut self.cb_executor) == EventResponse::HandledRedraw {
                 self.render_dirty = true;
             }
         } else {
-            if self.widgets[id].on_cursor_leave(&mut executor) == EventResponse::HandledRedraw {
+            if self.widgets[id].on_cursor_leave(&mut self.cb_executor) == EventResponse::HandledRedraw {
                 self.render_dirty = true;
             }
         }
@@ -286,7 +242,7 @@ where
         }
     }
     fn complete_cursor_inside(&mut self, i: usize, p: Vec2) {
-        for &id in &self.widget_graph[i] {
+        for &id in self.widget_graph[i].iter().rev() {
             if self.point_in_widget(id, p) {
                 self.cursor_hierarchy = Some(id);
                 self.fire_enter_leave_event(id, true);
@@ -308,7 +264,7 @@ where
             }
         }
         if self.cursor_hierarchy.is_none() {
-            for i in 0..self.widget_count() {
+            for i in (0..self.widget_count()).rev() {
                 if self.parents[i].is_none() && self.point_in_widget(i, p) {
                     self.cursor_hierarchy = Some(i);
                     self.fire_enter_leave_event(i, true);
@@ -322,6 +278,57 @@ where
     }
     pub fn set_profile(&mut self, enabled: bool) {
         self.profiler.set_enabled(enabled);
+    }
+    fn render(&mut self) {
+        crate::tools::gltraits::check_glerr_debug();
+        let rseq = self.render_seq.as_ref().unwrap();
+
+        self.profiler.begin_gpu("Draw");
+        rseq.execute(&mut self.draw_res);
+        self.profiler.end_gpu();
+    }
+    fn handle_event(&mut self, event: GlutinEvent) {
+        match event {
+            GlutinEvent::Resized(size) => {
+                self.resized(size.into());
+            }
+            GlutinEvent::KeyboardInput { input, .. } => match input.virtual_keycode {
+                None => (),
+                Some(key) => {
+                    if input.state == glutin::event::ElementState::Pressed {
+                        self.key_pressed(key);
+                    } else {
+                        self.key_released(key);
+                    }
+                }
+            },
+            GlutinEvent::MouseInput { button, state, .. } => {
+                if state == glutin::event::ElementState::Pressed {
+                    self.button_pressed(button);
+                } else {
+                    self.button_released(button);
+                }
+            }
+            GlutinEvent::CursorMoved { position, .. } => {
+                self.cursor_moved(position.into());
+            }
+            GlutinEvent::CursorLeft { .. } => {
+                self.cursor_left();
+            }
+            _ => (),
+        }
+    }
+    fn actualize_data(&mut self) {
+        let build_data = self.cb_executor.data.downcast_mut::<D>().unwrap();
+        
+        if self.build_data != *build_data {
+            self.build_data = build_data.clone();
+            self.rebuild_gui();
+            self.rebuild_cursor_inside(self.cursor_pos);
+        }
+        if self.render_dirty {
+            self.rebuild_render_seq();
+        }
     }
 }
 
@@ -338,5 +345,22 @@ impl<D> Drop for GuiContext<D> {
 
             self.profiler.print(&mut file).unwrap();
         }
+    }
+}
+
+pub struct PostBox {
+    messages: Vec<AnnotatedMessage>,
+}
+
+impl PostBox {
+    pub fn new() -> Self {
+        PostBox { messages: vec![] }
+    }
+    pub fn send<T, M>(&mut self, target: T, msg: M)
+    where
+        T: Into<MessageTarget>,
+        M: Message,
+    {
+        self.messages.push((target, msg).into());
     }
 }

@@ -1,7 +1,12 @@
+extern crate glutin;
+
+use self::glutin::platform::desktop::EventLoopExtDesktop;
 use super::*;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::mem::swap;
 use std::sync::mpsc::*;
+use tools::*;
 
 pub struct World {
     static_world: StaticWorld,
@@ -9,6 +14,15 @@ pub struct World {
     actors: HashMap<ActorId, Box<dyn Actor>>,
     next_actor_id: usize,
     loop_data: MessageLoopData,
+    ui_aware_actors: HashSet<ActorId>,
+}
+
+fn clone_glutin_event(event: &GlutinEvent<'static>) -> GlutinEvent<'static> {
+    let mut cloned = GlutinEvent::<'static>::CloseRequested;
+    unsafe {
+        std::ptr::copy_nonoverlapping(event, &mut cloned, 1);
+    }
+    cloned
 }
 
 impl World {
@@ -20,6 +34,23 @@ impl World {
             actors: Default::default(),
             next_actor_id: 0,
             loop_data: MessageLoopData::HandRolled(sender, receiver),
+            ui_aware_actors: Default::default(),
+        }
+    }
+    pub fn new_win(size: Vec2, title: &str, bgcolor: Vec3) -> World {
+        World {
+            static_world: Default::default(),
+            systems: Default::default(),
+            actors: Default::default(),
+            next_actor_id: 0,
+            loop_data: MessageLoopData::Glutin(GlutinWindowData::new(size, title, bgcolor)),
+            ui_aware_actors: Default::default(),
+        }
+    }
+    pub fn render_target(&self) -> Option<RenderTarget> {
+        match &self.loop_data {
+            MessageLoopData::Glutin(win) => Some(win.render_target()),
+            _ => None,
         }
     }
     pub fn as_static(&self) -> &StaticWorld {
@@ -50,13 +81,14 @@ impl World {
         self.actors.insert(id, Box::new(actor));
         id
     }
+    pub fn del_actor(&mut self, id: ActorId) {
+        self.actors.remove(&id);
+        self.ui_aware_actors.remove(&id);
+    }
+    pub fn make_actor_ui_aware(&mut self, id: ActorId) {
+        self.ui_aware_actors.insert(id);
+    }
 
-    // pub fn system<S>(&mut self) -> Option<&mut S>
-    // where
-    //     S: System + 'static,
-    // {
-    //     self.systems.get_mut(&SystemId::of::<S>())
-    // }
     pub fn deliver_all_messages(&mut self) {
         while !self.static_world.queued_messages.is_empty() {
             self.deliver_messages();
@@ -70,13 +102,19 @@ impl World {
                 MessageTarget::System(id) => {
                     self.systems
                         .get_mut(&id)
-                        .expect(&format!("Message {:?} sent to non-existing system!", msg.payload))
+                        .expect(&format!(
+                            "Message {:?} sent to non-existing system!",
+                            msg.payload
+                        ))
                         .receive(msg.payload, &mut self.static_world);
                 }
                 MessageTarget::Actor(id) => {
                     self.actors
                         .get_mut(&id)
-                        .expect(&format!("Message {:?} sent to non-existing actor!", msg.payload))
+                        .expect(&format!(
+                            "Message {:?} sent to non-existing actor!",
+                            msg.payload
+                        ))
                         .receive(msg.payload, &mut self.static_world);
                 }
                 MessageTarget::None => {}
@@ -89,31 +127,30 @@ impl World {
                 MessageChannel::from_sender(sender.clone())
             }
             MessageLoopData::Glutin(win) => MessageChannel::from_window(&win),
-            MessageLoopData::Consumed => panic!("Cannot give channel to consumed message loop data!"),
+            MessageLoopData::Consumed => {
+                panic!("Cannot give channel to consumed message loop data!")
+            }
         }
     }
     pub fn run(self) {
         match self.loop_data {
             MessageLoopData::HandRolled(_, _) => {
-                self.run_msg_loop();
+                self.owned_msg_loop();
             }
-            MessageLoopData::Glutin(win) => {
-                win.run(GuiWinProps::tester());
+            MessageLoopData::Glutin(_) => {
+                self.glutin_msg_loop();
             }
             MessageLoopData::Consumed => {}
         }
     }
-    fn run_msg_loop(mut self) {
-        
+    fn owned_msg_loop(mut self) {
         let mut loop_data = MessageLoopData::Consumed;
         std::mem::swap(&mut loop_data, &mut self.loop_data);
-        
         if let MessageLoopData::HandRolled(_, receiver) = loop_data {
             let mut finished = false;
             while !finished {
                 let msg = receiver.recv().unwrap();
                 println!("msg loop got: {:?}", msg);
-                
                 if msg.target == MessageTarget::None {
                     if msg.payload.is::<message::Exit>() {
                         finished = true;
@@ -125,4 +162,106 @@ impl World {
             }
         }
     }
+    fn send_event_to_ui_aware<'a>(&mut self, event: GlutinEvent<'a>) {
+        if let Some(event) = event.to_static() {
+            for &id in &self.ui_aware_actors {
+                self.static_world
+                    .send(id, UiEvent::GlutinEvent(clone_glutin_event(&event)));
+            }
+        }
+    }
+    fn send_to_ui_aware<'a>(&mut self, event: ClonableUiEvent) {
+        for &id in &self.ui_aware_actors {
+            self.static_world.send(id, UiEvent::from(event));
+        }
+    }
+    fn glutin_msg_loop(mut self) {
+        use self::glutin::event_loop::ControlFlow;
+        let mut loop_data = MessageLoopData::Consumed;
+        std::mem::swap(&mut loop_data, &mut self.loop_data);
+        if let MessageLoopData::Glutin(win) = loop_data {
+            let (mut event_loop, win, bgcolor) = win.unpack();
+            event_loop.run_return(move |event, _, control_flow| {
+                // println!("Event received {:?}", event);
+                *control_flow = ControlFlow::Wait;
+                match event {
+                    glutin::event::Event::WindowEvent { event, .. } => {
+                        match event {
+                            glutin::event::WindowEvent::CloseRequested => {
+                                *control_flow = ControlFlow::Exit;
+                            }
+                            glutin::event::WindowEvent::KeyboardInput { input, .. } => {
+                                match input.virtual_keycode {
+                                    None => (),
+                                    Some(glutin::event::VirtualKeyCode::Escape) => {
+                                        *control_flow = ControlFlow::Exit;
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            glutin::event::WindowEvent::Resized(size) => {
+                                unsafe {
+                                    gl::Viewport(0, 0, size.width as i32, size.height as i32);
+                                }
+                            },
+                            _ => (),
+                        }
+                        self.send_event_to_ui_aware(event);
+                        self.deliver_all_messages();
+                        
+                        win.window().request_redraw();
+                    }
+                    glutin::event::Event::RedrawRequested(..) => {
+                        unsafe {
+                            gl::ClearColor(bgcolor.x, bgcolor.y, bgcolor.z, 1.0);
+                            gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+                        }
+                        self.send_to_ui_aware(ClonableUiEvent::Redraw);
+                        self.deliver_all_messages(); // FIXME: don't deliver all
+                        win.swap_buffers().unwrap();
+                    }
+                    glutin::event::Event::UserEvent(msg) => {
+                        if msg.target == MessageTarget::None {
+                            if msg.payload.is::<message::Exit>() {
+                                *control_flow = ControlFlow::Exit;
+                            }
+                        } else {
+                            self.static_world.send_annotated(msg);
+                        }
+                    }
+                    glutin::event::Event::MainEventsCleared => {
+                        self.send_to_ui_aware(ClonableUiEvent::EventsCleared);
+                        self.deliver_all_messages();
+                    }
+                    // glutin::event::Event::RedrawEventsCleared => {
+                    //     win.window().request_redraw();
+                    // }
+                    _ => (),
+                }
+            });
+        }
+    }
 }
+
+#[derive(Debug, Copy, Clone)]
+enum ClonableUiEvent {
+    Redraw,
+    EventsCleared,
+}
+
+impl From<ClonableUiEvent> for UiEvent {
+    fn from(cuiev: ClonableUiEvent) -> UiEvent {
+        match cuiev {
+            ClonableUiEvent::Redraw => UiEvent::Redraw,
+            ClonableUiEvent::EventsCleared => UiEvent::EventsCleared,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum UiEvent {
+    GlutinEvent(GlutinEvent<'static>),
+    Redraw,
+    EventsCleared,
+}
+impl Message for UiEvent {}

@@ -1,5 +1,4 @@
 extern crate gl;
-extern crate derive_more;
 extern crate image;
 
 pub mod buffer;

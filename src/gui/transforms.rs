@@ -1,7 +1,6 @@
 use super::*;
 use std::any::Any;
 use std::cell::RefCell;
-use std::rc::Rc;
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -63,10 +62,16 @@ thread_local! {
     static WIDGETPARSER_INSTANCE: RefCell<WidgetParser> = RefCell::new(WidgetParser::default());
 }
 
+enum StoredCallback {
+    ZeroParam(Box<dyn Fn()>),
+    OneParam(Box<dyn Fn(&mut dyn Any)>),
+    TwoParams(Box<dyn Fn(&mut dyn Any, &mut PostBox)>),
+}
+
 #[derive(Default)]
 pub struct WidgetParser {
     output: Option<WidgetList>,
-    callbacks: HashMap<usize, Box<dyn Fn(&mut dyn Any)>>,
+    callbacks: HashMap<usize, StoredCallback>,
     next_callback_id: usize,
 }
 
@@ -78,15 +83,11 @@ impl WidgetParser {
         WIDGETPARSER_INSTANCE.with(|widget_parser| {
             widget_parser.borrow_mut().output = Some(WidgetList::default());
         });
-        
         generator();
-        
         let mut result = None;
-        
         WIDGETPARSER_INSTANCE.with(|widget_parser| {
             result = widget_parser.borrow_mut().output.take();
         });
-        
         result.unwrap()
     }
     pub fn parse_push<T>(w: T)
@@ -112,7 +113,7 @@ impl WidgetParser {
         WIDGETPARSER_INSTANCE.with(|widget_parser| {
             let mut widget_parser = widget_parser.borrow_mut();
             if let Some(widgetlist) = &mut widget_parser.output {
-                widgetlist.push_cache(WidgetBuildCache {cache_id});
+                widgetlist.push_cache(WidgetBuildCache { cache_id });
             }
         });
     }
@@ -130,30 +131,50 @@ impl WidgetParser {
     {
         // println!("Registered param {:?}", param);
     }
-    pub fn make_callback<F, D>(f: F) -> GuiCallback
-    where
-        F: 'static + Fn(&mut D),
-        D: 'static,
-    {
+    fn add_callback(cb: StoredCallback) -> GuiCallback {
         let mut id: usize = 0;
-        
         WIDGETPARSER_INSTANCE.with(|widget_parser| {
             let mut widget_parser = widget_parser.borrow_mut();
-            
             id = widget_parser.next_callback_id;
             widget_parser.next_callback_id += 1;
-            
-            widget_parser.callbacks.insert(id, Box::new(move |input: &mut dyn Any|{
-                f(input.downcast_mut().unwrap());
-            }));
+
+            widget_parser.callbacks.insert(id, cb);
         });
-        
         GuiCallback {
             callback_id: Some(id),
         }
     }
-    pub fn remove_callback(cb: &GuiCallback)
+    
+    pub fn make_callback2<F, D>(f: F) -> GuiCallback
+    where
+        F: 'static + Fn(&mut D, &mut PostBox),
+        D: 'static,
     {
+        WidgetParser::add_callback(StoredCallback::TwoParams(Box::new(
+            move |input: &mut dyn Any, post: &mut PostBox| {
+                f(input.downcast_mut().unwrap(), post);
+            },
+        )))
+    }
+    
+    pub fn make_callback1<F, D>(f: F) -> GuiCallback
+    where
+        F: 'static + Fn(&mut D),
+        D: 'static,
+    {
+        WidgetParser::add_callback(StoredCallback::OneParam(Box::new(
+            move |input: &mut dyn Any| {
+                f(input.downcast_mut().unwrap());
+            },
+        )))
+    }
+    pub fn make_callback0<F>(f: F) -> GuiCallback
+    where
+        F: 'static + Fn(),
+    {
+        WidgetParser::add_callback(StoredCallback::ZeroParam(Box::new(f)))
+    }
+    pub fn remove_callback(cb: &GuiCallback) {
         if let Some(id) = cb.callback_id {
             WIDGETPARSER_INSTANCE.with(|widget_parser| {
                 let mut widget_parser = widget_parser.borrow_mut();
@@ -161,13 +182,16 @@ impl WidgetParser {
             });
         }
     }
-    pub fn execute_callback(cb: &GuiCallback, data: &mut dyn Any)
-    {
+    pub fn execute_callback(cb: &GuiCallback, data: &mut dyn Any, sender: &mut PostBox) {
         if let Some(id) = cb.callback_id {
             WIDGETPARSER_INSTANCE.with(|widget_parser| {
                 let widget_parser = widget_parser.borrow();
-                if let Some(fun) = widget_parser.callbacks.get(&id) {
-                    fun(data);
+                if let Some(callback) = widget_parser.callbacks.get(&id) {
+                    match callback {
+                        StoredCallback::ZeroParam(f) => f(),
+                        StoredCallback::OneParam(f) => f(data),
+                        StoredCallback::TwoParams(f) => f(data, sender),
+                    }
                 }
             });
         }
@@ -185,13 +209,14 @@ impl Drop for GuiCallback {
     }
 }
 
-pub struct CallbackExecutor<'a> {
-    pub data: &'a mut dyn Any,
+pub struct CallbackExecutor {
+    pub data: Box<dyn Any>,
+    pub sender: PostBox
 }
 
-impl<'a> CallbackExecutor<'a> {
+impl CallbackExecutor {
     pub fn execute(&mut self, cb: &GuiCallback) {
-        WidgetParser::execute_callback(cb, self.data);
+        WidgetParser::execute_callback(cb, &mut *self.data, &mut self.sender);
     }
 }
 
@@ -200,7 +225,9 @@ pub struct WidgetLayoutBuilder {
     pub postorder: Vec<usize>,
     pub widget_graph: Vec<Vec<usize>>,
     pub constraints: Vec<WidgetConstraints>,
-    pub positions: Vec<Vec2px>,
+    pub positions: Vec<WidgetPosition>,
+    pub max_descent: Vec<f32>,
+    root_descent: f32,
     next_child_constraints: Vec<WidgetConstraints>,
     win_size: Vec2px,
 }
@@ -218,23 +245,39 @@ impl WidgetLayoutBuilder {
             constraints: vec![],
             positions: vec![],
             next_child_constraints: vec![],
+            root_descent: 0.015,
             win_size: Vec2px::zero(),
+            max_descent: vec![],
         }
     }
 
-    fn adopt_size(&mut self, n: usize) {
+    fn set_widget_count(&mut self, n: usize) {
         self.constraints.resize(n, Default::default());
         self.positions.resize(n, Default::default());
+        self.max_descent.resize(n, Default::default());
         self.next_child_constraints.resize(n, Default::default());
     }
     fn pop(&mut self, id: usize, parent: Option<usize>) {
         self.positions[id] = match parent {
             Some(parid) => {
                 let s = self.widgets[id].size();
-                self.widgets[parid].place_child(s)
+                let p = self.widgets[parid].place_child(s, self.max_descent[id]);
+                self.max_descent[parid] = f32::max(
+                    self.max_descent[id] + p.depth,
+                    self.max_descent[parid]
+                );
+                p
             }
-            None => Vec2px::zero(),
-        }
+            None => {
+                let d = self.root_descent;
+                
+                self.root_descent += self.max_descent[id] + WidgetPosition::from(Vec2px::origin()).depth;
+                
+                WidgetPosition::new(Vec2px::origin(), d)
+            }
+        };
+        
+        // println!("Widget id {}, size: {:?} has been put to {:?}", id, self.widgets[id].size(), self.positions[id]);
     }
     fn push(&mut self, id: usize, parent: Option<usize>) {
         match parent {
@@ -261,16 +304,30 @@ impl WidgetLayoutBuilder {
             None => self.constraints[id],
         }
     }
-    pub fn make_pos_abs(&mut self, index: usize, offset: Vec2px) {
+    pub fn make_pos_abs(&mut self) {
+        let mut visited = vec![false; self.widgets.len()];
+        
+        for i in 0..visited.len() {
+            if !visited[i] {
+                visited[i] = true;
+                self.make_pos_abs_rec(i, &mut visited);
+            }
+        }
+    }
+    fn make_pos_abs_rec(&mut self, index: usize, visited: &mut Vec<bool>) {
+        let offset = self.positions[index];
+        
         for &i in &self.widget_graph[index].clone() {
-            self.positions[i] += offset;
-            self.make_pos_abs(i, self.positions[i]);
+            self.positions[i].pos += offset.pos;
+            self.positions[i].depth += offset.depth;
+            visited[i] = true;
+            self.make_pos_abs_rec(i, visited);
         }
     }
     pub fn build(&mut self, win_size: Vec2px) {
         let n = self.widgets.len();
         self.win_size = win_size;
-        self.adopt_size(n);
+        self.set_widget_count(n);
 
         let mut id_stack: Vec<usize> = vec![];
         let mut cid = 0 as usize;
@@ -298,5 +355,9 @@ impl WidgetLayoutBuilder {
                 }
             }
         }
+        
+        self.make_pos_abs();
+        
+        // println!("depth are {:?}", self.positions.iter().map(|p| p.depth).collect::<Vec<f32>>());
     }
 }

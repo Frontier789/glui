@@ -4,3 +4,5 @@ Cargo.lock
 metal_plate
 cache*
 .idea/
+test/gomoku/performance.txt
+test/gomoku/packed

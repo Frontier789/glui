@@ -3,6 +3,6 @@ use super::*;
 
 pub enum MessageLoopData {
     HandRolled(Sender<AnnotatedMessage>, Receiver<AnnotatedMessage>),
-    Glutin(GlutinWindow),
+    Glutin(GlutinWindowData),
     Consumed,
 }

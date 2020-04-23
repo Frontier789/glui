@@ -1,5 +1,4 @@
 use super::*;
-use glutin::platform::desktop::EventLoopExtDesktop;
 use tools::*;
 
 pub type GlutinKey = glutin::event::VirtualKeyCode;
@@ -11,33 +10,13 @@ type GlutinGLWindowNC = glutin::ContextWrapper<glutin::NotCurrent, glutin::windo
 type GlutinEventLoop = glutin::event_loop::EventLoop<AnnotatedMessage>;
 type GlutinEventLoopProxy = glutin::event_loop::EventLoopProxy<AnnotatedMessage>;
 
-pub struct GuiWinProps {
-    pub quit_on_esc: bool,
-    pub quit_on_focus_lost: bool,
-}
-
-impl GuiWinProps {
-    pub fn quick_tester() -> GuiWinProps {
-        GuiWinProps {
-            quit_on_esc: true,
-            quit_on_focus_lost: true,
-        }
-    }
-    pub fn tester() -> GuiWinProps {
-        GuiWinProps {
-            quit_on_esc: true,
-            quit_on_focus_lost: false,
-        }
-    }
-}
-
-pub struct GlutinWindow {
+pub struct GlutinWindowData {
     event_loop: GlutinEventLoop,
     gl_window: GlutinGLWindow,
     bgcolor: Vec3,
 }
 
-impl GlutinWindow {
+impl GlutinWindowData {
     fn prepare_gl(gl_window: GlutinGLWindowNC, bgcolor: Vec3) -> GlutinGLWindow {
         gl_window
             .window()
@@ -54,11 +33,7 @@ impl GlutinWindow {
         gl_window
     }
 
-    pub fn create_window(
-        size: Vec2,
-        title: &str,
-        event_loop: &GlutinEventLoop,
-    ) -> GlutinGLWindowNC {
+    fn create_window(size: Vec2, title: &str, event_loop: &GlutinEventLoop) -> GlutinGLWindowNC {
         let window_builder = glutin::window::WindowBuilder::new()
             .with_title(title)
             .with_inner_size(glutin::dpi::LogicalSize::new(size.x, size.y))
@@ -72,7 +47,7 @@ impl GlutinWindow {
         let event_loop = glutin::event_loop::EventLoop::with_user_event();
         let gl_window = Self::prepare_gl(Self::create_window(size, title, &event_loop), bgcolor);
         gl_window.window().set_visible(true);
-        GlutinWindow {
+        GlutinWindowData {
             event_loop,
             gl_window,
             bgcolor,
@@ -87,60 +62,11 @@ impl GlutinWindow {
         }
         .fill_from_context()
     }
-
-    pub fn run(self, props: GuiWinProps) {
-        let mut event_loop = self.event_loop;
-        let gl_window = self.gl_window;
-        let bgcolor = self.bgcolor;
-        event_loop.run_return(move |event, _, control_flow| {
-            *control_flow = glutin::event_loop::ControlFlow::Wait;
-            match event {
-                glutin::event::Event::WindowEvent { event, .. } => {
-                    match event {
-                        glutin::event::WindowEvent::CloseRequested => {
-                            *control_flow = glutin::event_loop::ControlFlow::Exit;
-                        }
-                        glutin::event::WindowEvent::Focused(false) => {
-                            if props.quit_on_focus_lost {
-                                *control_flow = glutin::event_loop::ControlFlow::Exit;
-                            }
-                        }
-                        glutin::event::WindowEvent::KeyboardInput { input, .. } => {
-                            match input.virtual_keycode {
-                                None => (),
-                                Some(glutin::event::VirtualKeyCode::Escape) => {
-                                    if props.quit_on_esc {
-                                        *control_flow = glutin::event_loop::ControlFlow::Exit;
-                                    }
-                                }
-                                _ => {}
-                            }
-                        }
-                        glutin::event::WindowEvent::Resized(size) => unsafe {
-                            gl::Viewport(0, 0, size.width as i32, size.height as i32);
-                        },
-                        _ => (),
-                    }
-                    // world.handle_event(event);
-                }
-                glutin::event::Event::RedrawRequested(..) => {
-                    unsafe {
-                        gl::ClearColor(bgcolor.x, bgcolor.y, bgcolor.z, 1.0);
-                        gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
-                    }
-                    // world.render();
-                    gl_window.swap_buffers().unwrap();
-                }
-                glutin::event::Event::RedrawEventsCleared => {
-                    gl_window.window().request_redraw();
-                }
-                _ => (),
-            }
-        });
-    }
-    
     pub fn event_loop_proxy(&self) -> GlutinEventLoopProxy {
         self.event_loop.create_proxy()
+    }
+    pub fn unpack(self) -> (GlutinEventLoop,GlutinGLWindow,Vec3) {
+        (self.event_loop, self.gl_window, self.bgcolor)
     }
 }
 

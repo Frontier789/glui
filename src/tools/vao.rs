@@ -2,6 +2,7 @@ use super::gl::types::*;
 use super::Buffer;
 use super::GlNum;
 
+#[derive(Debug)]
 pub struct VertexArray {
     id: u32
 }

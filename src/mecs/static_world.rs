@@ -94,7 +94,7 @@ impl StaticWorld {
         self.send_annotated((target, msg).into());
     }
     
-    pub(super) fn send_annotated(&mut self, msg: AnnotatedMessage)
+    pub fn send_annotated(&mut self, msg: AnnotatedMessage)
     {
         self.queued_messages.push(msg);
     }

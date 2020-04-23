@@ -1,7 +1,8 @@
 use super::font::*;
-use gl::types::*;
+use super::gl::types::*;
 use std::collections::HashMap;
 use tools::*;
+use mecs::RenderTarget;
 
 use super::font;
 
@@ -106,7 +107,7 @@ impl DrawResources {
 }
 
 #[derive(Debug)]
-enum DrawColor {
+pub enum DrawColor {
     Array(Vec<Vec4>),
     Const(Vec4),
     Default,
@@ -119,6 +120,7 @@ struct DrawObject {
     tpt: Option<Vec<Vec2>>,
     tex: Option<u32>,
     transparent: bool,
+    depth: f32,
 }
 
 pub struct DrawBuilder<'a> {
@@ -204,32 +206,41 @@ impl<'a> DrawBuilder<'a> {
             tpt: None,
             tex: None,
             transparent: antialias,
+            depth: self.offset.z,
         })
     }
     pub fn add_clr_rect(&mut self, rct: Rect, clr: Vec4) {
+        if clr.w == 0.0 {return;}
+        
         self.objects.push(DrawObject {
             pts: offset(rct.triangulate_3d(), self.offset),
             clr: DrawColor::Const(clr),
             tpt: None,
             tex: None,
             transparent: clr.w < 1.0,
+            depth: self.offset.z,
         })
     }
-    pub fn add_tex_rect(&mut self, rct: Rect, tex_name: &str) {
+    pub fn add_tex_rect(&mut self, rct: Rect, tex_name: &str, clr: Vec4) {
+        if tex_name.is_empty() || clr.w == 0.0 {return;}
+        
+        // println!("Adding tex \"{}\" at {:?} with offset {:?}", tex_name, rct.pos(), self.offset);
+        
         self.objects.push(DrawObject {
             pts: offset(rct.triangulate_3d(), self.offset),
-            clr: DrawColor::Default,
+            clr: DrawColor::Const(clr),
             tpt: Some(Rect::unit().triangulate()),
             tex: Some(self.draw_resources.texture_id(tex_name)),
-            transparent: false,
+            transparent: true,
+            depth: self.offset.z,
         })
     }
-    pub fn add_text(&mut self, text: &str, font: &str, size: Vec2, clr: Vec4, align: font::Align) {
+    pub fn add_text(&mut self, text: &str, font: &str, size: Vec2, clr: Vec4, align: font::Align, font_size: f32) {
         let font = self.draw_resources.fonts.font_family(&font).unwrap();
         let (bb_rects, uv_rects) = font.layout_paragraph(
             &text,
-            24.0,
-            24.0,
+            f32::round(font_size),
+            f32::round(font_size),
             align,
             size,
         );
@@ -244,6 +255,7 @@ impl<'a> DrawBuilder<'a> {
             tpt: Some(uv_rects.iter().map(|r| r.triangulate()).flatten().collect()),
             tex: Some(font.tex.id()),
             transparent: true,
+            depth: self.offset.z,
         })
     }
 
@@ -320,9 +332,14 @@ impl<'a> DrawBuilder<'a> {
 
     pub fn to_render_sequence(mut self, render_target: &RenderTarget) -> RenderSequence {
         let cmp_dobj = |o1: &DrawObject, o2: &DrawObject| {
-            o1.transparent
-                .cmp(&o2.transparent)
-                .then(o1.tex.cmp(&o2.tex))
+            if o1.depth != o2.depth && (o1.transparent || o2.transparent) {
+                o1.depth.partial_cmp(&o2.depth).unwrap()
+            } else {
+                o1.transparent
+                    .cmp(&o2.transparent)
+                    .then(o1.tex.cmp(&o2.tex))
+            }
+            
         };
         self.objects.sort_by(cmp_dobj);
         let n = self.objects.len();
@@ -343,13 +360,14 @@ impl<'a> DrawBuilder<'a> {
 }
 
 #[derive(Debug)]
-enum Uniform {
+pub enum Uniform {
     Vector2(String, Vec2),
     Vector4(String, Vec4),
     Matrix4(String, Mat4),
     Texture2D(String, u32),
 }
 
+#[derive(Debug)]
 pub struct RenderSequence {
     buffers: Vec<Buffer<f32>>,
     commands: Vec<RenderCommand>,
@@ -388,6 +406,7 @@ impl RenderSequence {
     }
 }
 
+#[derive(Debug)]
 struct RenderCommand {
     pub vao: VertexArray,
     pub mode: DrawMode,

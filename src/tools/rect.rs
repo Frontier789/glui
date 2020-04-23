@@ -37,6 +37,13 @@ impl Rect {
         }
     }
     
+    pub fn pos(&self) -> Vec2 {
+        Vec2::new(
+            self.left,
+            self.top,
+        )
+    }
+    
     pub fn from_min_max(min: Vec2, max: Vec2) -> Rect {
         Rect {
             left: min.x,

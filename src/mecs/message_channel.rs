@@ -20,7 +20,7 @@ impl MessageChannel {
         }
     }
     
-    pub fn from_window(win: &GlutinWindow) -> MessageChannel {
+    pub fn from_window(win: &GlutinWindowData) -> MessageChannel {
         MessageChannel {
             implementation: ChannelImpl::Glutin(win.event_loop_proxy())
         }
