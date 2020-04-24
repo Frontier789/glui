@@ -51,6 +51,7 @@ fn finished_gui(res: GameResult, board: Board) {
                 callback: |data| {
                     data.state = GameState::MainMenu;
                     data.board = Board::default();
+                    ai_new_game();
                 },
             };
         },
@@ -77,7 +78,8 @@ fn main_menu_gui() {
                     };
                     Button {
                         callback: |data| {
-                            data.state = GameState::Playing(PlayerInt::Human, PlayerInt::AI)
+                            data.state = GameState::Playing(PlayerInt::AI, PlayerInt::Human);
+                            ai_move(&mut data.board);
                         },
                         text: "Human v AI".to_owned(),
                         background: ButtonBckg::Fill(Vec4::new(1.0, 1.0, 1.0, 0.1)),

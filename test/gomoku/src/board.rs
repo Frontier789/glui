@@ -121,11 +121,11 @@ impl Board {
         self.moves.push((x,y));
         self.result()
     }
-    pub fn undo(&mut self) {
-        if let Some(p) = self.moves.pop() {
-            self.cells[p.0][p.1] = Cell::Empty;
-        }
-    }
+    // pub fn undo(&mut self) {
+    //     if let Some(p) = self.moves.pop() {
+    //         self.cells[p.0][p.1] = Cell::Empty;
+    //     }
+    // }
     fn check_line(line: BoardLineIterator) -> GameResult {
         use Cell::*;
         let mut stack = Vec::<Cell>::new();

@@ -1,3 +1,4 @@
+#![windows_subsystem = "windows"]
 extern crate glui;
 extern crate rand;
 extern crate rusty;
@@ -16,7 +17,7 @@ use ui::*;
 
 fn main() {
     let mut w: World = World::new_win(Vec2::new(640.0, 480.0), "", Vec3::grey(0.1));
-
+    
     let mut gui = GuiContext::new(
         w.render_target().unwrap(),
         true,
