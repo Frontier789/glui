@@ -1,5 +1,9 @@
-use super::*;
 use std::f32::consts::PI;
+use super::draw::*;
+use super::widget::*;
+use super::transforms::*;
+use tools::*;
+use super::font;
 
 #[derive(Default)]
 pub struct VertLayoutPriv {
@@ -104,7 +108,8 @@ impl Widget for FixedPanel {
                 PanelDirection::Up => Vec2px::new(0.0, self.size),
             },
             _ => Vec2px::zero(),
-        }.into()
+        }
+        .into()
     }
 
     fn size(&self) -> Vec2px {
@@ -182,40 +187,104 @@ impl Widget for GridLayout {
                 self.private.col_widths[self.private.child_id % self.col_widths.len()];
         }
         self.private.child_id += 1;
-        
         p.into()
     }
 }
 
-#[derive(Default)]
-pub struct PaddingPrivate {
-    real_size: Vec2px,
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum PaddingValue {
+    Default,
+    Relative(f32),
+    Units(f32),
 }
 
-#[derive(Default)]
+impl Default for PaddingValue {
+    fn default() -> PaddingValue {
+        PaddingValue::Default
+    }
+}
+
+impl PaddingValue {
+    pub fn to_units(self, size: f32) -> f32 {
+        match self {
+            PaddingValue::Default => 0.0,
+            PaddingValue::Relative(r) => size * r,
+            PaddingValue::Units(x) => x,
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct PaddingPrivate {
+    all_size: Vec2px,
+    stacking_depth: f32,
+}
+
+#[derive(Debug, Default)]
 pub struct Padding {
-    pub left: f32,
-    pub right: f32,
-    pub top: f32,
-    pub bottom: f32,
+    pub left: PaddingValue,
+    pub right: PaddingValue,
+    pub top: PaddingValue,
+    pub bottom: PaddingValue,
     pub private: PaddingPrivate,
 }
 
 impl Widget for Padding {
     fn constraint(&mut self, self_constraint: WidgetConstraints) {
-        self.private.real_size = self_constraint.max_size;
+        self.private.all_size = self_constraint.max_size;
     }
     fn size(&self) -> Vec2px {
-        self.private.real_size
+        self.private.all_size
     }
     fn child_constraint(&self) -> Option<WidgetConstraints> {
         Some(WidgetConstraints {
-            max_size: self.size() - Vec2px::new(self.left + self.right, self.top + self.bottom),
+            max_size: self.size() - self.pad_size(),
         })
     }
 
-    fn place_child(&mut self, _child_size: Vec2px, _child_descent: f32) -> WidgetPosition {
-        Vec2px::new(self.left, self.top).into()
+    fn place_child(&mut self, child_size: Vec2px, child_descent: f32) -> WidgetPosition {
+        let s = self.size();
+        let sd = self.private.stacking_depth;
+        self.private.stacking_depth += child_descent;
+        
+        let padx = self.left.to_units(s.x);
+        let pady = self.left.to_units(s.y);
+
+        WidgetPosition::new(
+            Vec2px::new(
+                s.x / (padx + self.right.to_units(s.x)) * padx,
+                s.y / (pady + self.right.to_units(s.y)) * pady,
+            ) - child_size / 2.0,
+            sd,
+        )
+    }
+}
+
+impl Padding {
+    fn pad_size(&self) -> Vec2px {
+        let s = self.size();
+        Vec2px::new(
+            self.left.to_units(s.x) + self.right.to_units(s.x),
+            self.top.to_units(s.y) + self.bottom.to_units(s.y),
+        )
+    }
+    pub fn absolute(amount: f32) -> Padding {
+        Padding {
+            left: PaddingValue::Units(amount),
+            right: PaddingValue::Units(amount),
+            top: PaddingValue::Units(amount),
+            bottom: PaddingValue::Units(amount),
+            ..Default::default()
+        }
+    }
+    pub fn relative(ratio: f32) -> Padding {
+        Padding {
+            left: PaddingValue::Relative(ratio),
+            right: PaddingValue::Relative(ratio),
+            top: PaddingValue::Relative(ratio),
+            bottom: PaddingValue::Relative(ratio),
+            ..Default::default()
+        }
     }
 }
 
@@ -223,7 +292,7 @@ impl Widget for Padding {
 pub enum FontSize {
     Em(f32),
     Relative(f32),
-    RelativeSteps(f32, (f32,f32), f32),
+    RelativeSteps(f32, (f32, f32), f32),
 }
 
 impl Default for FontSize {
@@ -233,7 +302,7 @@ impl Default for FontSize {
 }
 
 impl FontSize {
-    pub fn relative_steps(ratio: f32, range: (f32,f32), step: f32) -> Self {
+    pub fn relative_steps(ratio: f32, range: (f32, f32), step: f32) -> Self {
         FontSize::RelativeSteps(ratio, range, step)
     }
     pub fn to_pixels(&self, text_area: f32, gui_scale: f32) -> f32 {
@@ -373,9 +442,9 @@ impl Widget for Button {
             ButtonBckg::Cirlce(c) | ButtonBckg::Fill(c) | ButtonBckg::RoundRect(c, _) => {
                 let intensity = c.intensity();
                 let bckg_clr_direction = if intensity < 0.5 {
-                    Vec4::new(1.0,1.0,1.0, c.w)
+                    Vec4::new(1.0, 1.0, 1.0, c.w)
                 } else {
-                    Vec4::new(0.0,0.0,0.0, c.w)
+                    Vec4::new(0.0, 0.0, 0.0, c.w)
                 };
                 let bckg_clr = match self.private.state {
                     ButtonState::Normal => c,
@@ -502,11 +571,8 @@ impl Widget for Square {
     fn place_child(&mut self, child_size: Vec2px, child_descent: f32) -> WidgetPosition {
         let sd = self.private.stacking_depth;
         self.private.stacking_depth += child_descent;
-        
-        WidgetPosition::new(
-            self.private.outer_size * 0.5 - child_size * 0.5,
-            sd,
-        )
+
+        WidgetPosition::new(self.private.outer_size * 0.5 - child_size * 0.5, sd)
     }
 
     fn size(&self) -> Vec2px {
@@ -527,11 +593,11 @@ pub struct Overlay {
 impl Default for Overlay {
     fn default() -> Self {
         Overlay {
-            color: Vec4::new(0.0,0.0,0.0,0.3),
+            color: Vec4::new(0.0, 0.0, 0.0, 0.3),
             private: OverlayPrivate {
                 size: Default::default(),
                 stacking_depth: 0.01,
-            }
+            },
         }
     }
 }
@@ -548,11 +614,8 @@ impl Widget for Overlay {
     fn place_child(&mut self, child_size: Vec2px, child_descent: f32) -> WidgetPosition {
         let sd = self.private.stacking_depth;
         self.private.stacking_depth += child_descent;
-        
-        WidgetPosition::new(
-            self.private.size * 0.5 - child_size * 0.5,
-            sd,
-        )
+
+        WidgetPosition::new(self.private.size * 0.5 - child_size * 0.5, sd)
     }
 
     fn size(&self) -> Vec2px {
@@ -560,9 +623,6 @@ impl Widget for Overlay {
     }
     fn on_draw_build(&self, builder: &mut DrawBuilder) {
         let size = self.size().to_pixels(1.0);
-        builder.add_clr_rect(
-            Rect::from_min_max(Vec2::origin(), size),
-            self.color,
-        );
+        builder.add_clr_rect(Rect::from_min_max(Vec2::origin(), size), self.color);
     }
 }

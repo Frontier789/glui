@@ -1,13 +1,21 @@
 
 #[macro_export]
 macro_rules! register_gui_element_struct_init {
-    // base case
+    // base cases
+    ( $build_param:ty, $sender:ty, $parser:ident, $class:ident { $( $field_in:ident : $value_in:expr ,)* } @ .. $( $updated:tt )* ) => {
+        $class {
+            $( $field_in : $value_in ,)*
+            .. $( $updated )*
+        }
+    };
+    
     ( $build_param:ty, $sender:ty, $parser:ident, $class:ident { $( $field_in:ident : $value_in:expr ,)* } @ ) => {
         $class {
             $( $field_in : $value_in ,)*
             ..Default::default()
         }
     };
+    
     
     // take out children
     ( $build_param:ty, $sender:ty, $parser:ident, $class:ident { $( $field_in:ident : $value_in:expr ,)* } @ children : $value_c:expr $(,)? ) => {
@@ -92,23 +100,25 @@ macro_rules! register_gui_element_struct_init {
 
 #[macro_export]
 macro_rules! register_gui_element_children {
-    ( children : $f:expr, $( $x:tt),* $(,)? ) => {
+    ( children : $f:expr, $( $x:tt )* ) => {
         $f
     };
     ( children : $f:expr ) => {
         $f
     };
-    ( child : $f:expr, $( $x:tt),* $(,)? ) => {
+    ( child : $f:expr, $( $x:tt )* ) => {
         {
             $f;
         }
     };
-    ( $field_c:ident : $value_c:expr, $( $field:ident : $value:expr),* $(,)? ) => {
+    ( $field_c:ident : $value_c:expr, $( $rest:tt )* ) => {
         register_gui_element_children! {
-            $( $field : $value, )*
+            $( $rest )*
         }
     };
     ( $( $field:ident : $value:expr),* $(,)? ) => {
+    };
+    ( .. $( $rest:tt )* ) => {
     }
 }
 

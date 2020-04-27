@@ -1,8 +1,8 @@
 extern crate glui;
 extern crate rand;
 extern crate rusty;
-use std::collections::HashMap;
 use gamestate::PlayerInt;
+use std::collections::HashMap;
 
 pub const MAP_SIZE: usize = 15;
 
@@ -36,11 +36,11 @@ pub struct Board {
     moves: Vec<(usize, usize)>,
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum GameResult {
     NotFinished,
-    BlackWon,
-    WhiteWon,
+    BlackWon(Vec<(usize, usize)>),
+    WhiteWon(Vec<(usize, usize)>),
     Draw,
 }
 
@@ -56,12 +56,18 @@ impl GameResult {
     }
     pub fn win_text(&self) -> String {
         match self {
-            GameResult::BlackWon => "Black won",
-            GameResult::WhiteWon => "White won",
+            GameResult::BlackWon(_) => "Black won",
+            GameResult::WhiteWon(_) => "White won",
             GameResult::Draw => "It's a draw",
             _ => "",
         }
         .to_owned()
+    }
+    pub fn over(&self) -> bool {
+        match self {
+            GameResult::BlackWon(_) | GameResult::WhiteWon(_) | GameResult::Draw => true,
+            _ => false,
+        }
     }
 }
 
@@ -88,11 +94,26 @@ impl<'a> Iterator for BoardLineIterator<'a> {
     }
 }
 
+impl<'a> BoardLineIterator<'a> {
+    pub fn last5(&self) -> Vec<(usize, usize)> {
+        let (p, v) = (self.p, self.v);
+        vec![
+            (p.0 - v.0 * 1, p.1 - v.1 * 1),
+            (p.0 - v.0 * 2, p.1 - v.1 * 2),
+            (p.0 - v.0 * 3, p.1 - v.1 * 3),
+            (p.0 - v.0 * 4, p.1 - v.1 * 4),
+            (p.0 - v.0 * 5, p.1 - v.1 * 5),
+        ]
+        .iter()
+        .map(|(x, y)| (*x as usize, *y as usize))
+        .collect()
+    }
+}
+
 impl Board {
     pub fn moves(&self) -> &Vec<(usize, usize)> {
         &self.moves
     }
-    
     pub fn next_color(&self) -> Cell {
         let n = self.moves.len();
         if n % 2 == 0 {
@@ -103,11 +124,9 @@ impl Board {
     }
     pub fn move_to_id_map(&self) -> HashMap<(usize, usize), usize> {
         let mut map = HashMap::new();
-                            
         for i in 0..self.moves.len() {
-            map.insert(self.moves[i], i+1);
+            map.insert(self.moves[i], i + 1);
         }
-        
         map
     }
     pub fn human_comes(&self, black_player: PlayerInt, white_player: PlayerInt) -> bool {
@@ -118,7 +137,7 @@ impl Board {
     }
     pub fn put(&mut self, x: usize, y: usize) -> GameResult {
         self.cells[x][y] = self.next_color();
-        self.moves.push((x,y));
+        self.moves.push((x, y));
         self.result()
     }
     // pub fn undo(&mut self) {
@@ -126,11 +145,11 @@ impl Board {
     //         self.cells[p.0][p.1] = Cell::Empty;
     //     }
     // }
-    fn check_line(line: BoardLineIterator) -> GameResult {
+    fn check_line(mut line: BoardLineIterator) -> GameResult {
         use Cell::*;
         let mut stack = Vec::<Cell>::new();
         let mut has_space = false;
-        for cell in line {
+        while let Some(cell) = line.next() {
             match (cell, stack.last()) {
                 (Empty, _) => {
                     stack.clear();
@@ -139,7 +158,7 @@ impl Board {
                 (Black, Some(Black)) | (Black, None) => {
                     stack.push(Black);
                     if stack.len() == 5 {
-                        return GameResult::BlackWon;
+                        return GameResult::BlackWon(line.last5());
                     }
                 }
                 (Black, _) => {
@@ -149,7 +168,7 @@ impl Board {
                 (White, Some(White)) | (White, None) => {
                     stack.push(White);
                     if stack.len() == 5 {
-                        return GameResult::WhiteWon;
+                        return GameResult::WhiteWon(line.last5());
                     }
                 }
                 (White, _) => {

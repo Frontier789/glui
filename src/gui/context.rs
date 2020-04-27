@@ -1,8 +1,10 @@
-use super::*;
 use mecs::world::UiEvent;
 use mecs::*;
-use std::fs::File;
 use std::path::Path;
+use super::draw::*;
+use super::widget::*;
+use super::transforms::*;
+use tools::*;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum GrabState {
@@ -98,7 +100,7 @@ where
         self.draw_res.create_defaults().unwrap();
     }
     fn rebuild_render_seq(&mut self) {
-        self.profiler.begin("Rebuild Render");
+        self.profiler.begin("Rebuild_Render");
         let mut builder = DrawBuilder::new(&mut self.draw_res);
         let n = self.widgets.len();
         for i in 0..n {
@@ -113,7 +115,7 @@ where
 
     pub fn rebuild_gui(&mut self) {
         crate::tools::gltraits::check_glerr_debug();
-        self.profiler.begin("Rebuild Gui");
+        self.profiler.begin("Rebuild_Gui");
         let widget_builder = &self.widget_builder;
         let widget_list = WidgetParser::produce_list(|| {
             widget_builder(self.build_data.clone());
@@ -332,13 +334,15 @@ where
     }
 }
 
+use std::fs::OpenOptions;
+
 impl<D> Drop for GuiContext<D> {
     fn drop(&mut self) {
         if self.profiler.enabled() {
             let path = Path::new("performance.txt");
             let display = path.display();
-
-            let mut file = match File::create(&path) {
+            
+            let mut file = match OpenOptions::new().append(true).create(true).open(&path) {
                 Err(why) => panic!("couldn't create {}: {}", display, why),
                 Ok(file) => file,
             };

@@ -1,8 +1,8 @@
-use super::*;
 use std::collections::HashMap;
 use std::time::Duration;
 use std::time::Instant;
 use std::io::Write;
+use super::gpuclock::*;
 
 pub struct Profiler {
     times: HashMap<String, Vec<Duration>>,

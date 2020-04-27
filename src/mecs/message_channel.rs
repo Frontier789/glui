@@ -1,5 +1,6 @@
 use std::sync::mpsc::*;
-use super::*;
+use super::message::*;
+
 type GlutinEventLoopProxy = glutin::event_loop::EventLoopProxy<AnnotatedMessage>;
 
 #[derive(Clone)]
@@ -14,15 +15,15 @@ pub struct MessageChannel {
 }
 
 impl MessageChannel {
-    pub fn from_sender(sender: Sender<AnnotatedMessage>) -> MessageChannel {
+    pub(super) fn from_sender(sender: Sender<AnnotatedMessage>) -> MessageChannel {
         MessageChannel {
             implementation: ChannelImpl::HandRolled(sender)
         }
     }
     
-    pub fn from_window(win: &GlutinWindowData) -> MessageChannel {
+    pub(super) fn from_glutin(event_loop_proxy: GlutinEventLoopProxy) -> MessageChannel {
         MessageChannel {
-            implementation: ChannelImpl::Glutin(win.event_loop_proxy())
+            implementation: ChannelImpl::Glutin(event_loop_proxy)
         }
     }
     

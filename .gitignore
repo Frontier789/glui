@@ -7,3 +7,4 @@ cache*
 test/gomoku/performance.txt
 test/gomoku/packed
 test/gomoku/km.cer
+performance.txt

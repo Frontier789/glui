@@ -10,7 +10,7 @@ pub enum PlayerInt {
     AI,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum GameState {
     MainMenu,
     Playing(PlayerInt, PlayerInt),

@@ -1,0 +1,11 @@
+[package]
+name = "glinfo"
+version = "1.0.0"
+
+[dependencies]
+rusty = { path = "../.." }
+glui = { path = "../../../glui" }
+gl = "*"
+
+[profile.release]
+opt-level = 's'

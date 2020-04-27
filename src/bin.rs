@@ -17,6 +17,7 @@ use std::time::Instant;
 use tools::camera::Camera;
 use tools::*;
 
+use gui::elements::*;
 use gui::*;
 use mecs::*;
 
@@ -51,7 +52,7 @@ fn experimental(param: Data) {
         size: 50.0,
         children: {
             Padding {
-                left: 20.0,
+                left: PaddingValue::Units(20.0),
                 children: {
                     Text {
                         text: param.shown.clone(),
@@ -78,10 +79,6 @@ fn experimental(param: Data) {
 #[glui::builder(Data)]
 pub fn mybutton(text: String) {
     Padding {
-        left: 10.0,
-        right: 10.0,
-        top: 10.0,
-        bottom: 10.0,
         children: {
             Button {
                 text: text.clone(),
@@ -91,6 +88,7 @@ pub fn mybutton(text: String) {
                 background: ButtonBckg::RoundRect(Vec4::grey(0.1), 6.0),
             };
         },
+        ..Padding::absolute(10.0)
     };
 }
 
@@ -105,6 +103,8 @@ pub fn mybutton(text: String) {
 
 fn main() {
     let mut w: World = World::new_win(Vec2::new(640.0, 480.0), "", Vec3::grey(0.04));
+    
+    println!("hy");
 
     let mut gui = GuiContext::new(
         w.render_target().unwrap(),

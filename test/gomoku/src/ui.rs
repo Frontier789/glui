@@ -22,7 +22,7 @@ pub fn game_gui(data: GameData) {
         }
         GameState::Playing(black_player, white_player) => {
             let human_comes = data.board.human_comes(black_player, white_player);
-            board_gui(data.board, human_comes);
+            board_gui(data.board, human_comes, GameResult::NotFinished);
         }
         GameState::Exiting => {
             std::process::exit(0);
@@ -35,7 +35,7 @@ pub fn game_gui(data: GameData) {
 
 #[glui::builder(GameData)]
 fn finished_gui(res: GameResult, board: Board) {
-    board_gui(board, false);
+    board_gui(board, false, res.clone());
     Overlay {
         color: Vec4::new(1.0, 1.0, 1.0, 0.21),
         children: {
@@ -50,8 +50,6 @@ fn finished_gui(res: GameResult, board: Board) {
                 background: ButtonBckg::None,
                 callback: |data| {
                     data.state = GameState::MainMenu;
-                    data.board = Board::default();
-                    ai_new_game();
                 },
             };
         },
@@ -67,11 +65,12 @@ fn main_menu_gui() {
             };
             GridLayout {
                 col_widths: vec![1.0; 1],
-                row_heights: vec![1.0, 1.0, 2.0],
+                row_heights: vec![1.0, 1.0, 1.0, 3.0],
                 children: {
                     Button {
                         callback: |data| {
-                            data.state = GameState::Playing(PlayerInt::Human, PlayerInt::Human)
+                            data.state = GameState::Playing(PlayerInt::Human, PlayerInt::Human);
+                            data.board = Board::default();
                         },
                         text: "Human v human".to_owned(),
                         background: ButtonBckg::Fill(Vec4::new(1.0, 1.0, 1.0, 0.1)),
@@ -79,7 +78,18 @@ fn main_menu_gui() {
                     Button {
                         callback: |data| {
                             data.state = GameState::Playing(PlayerInt::AI, PlayerInt::Human);
+                            data.board = Board::default();
+                            ai_new_game();
                             ai_move(&mut data.board);
+                        },
+                        text: "AI v Human".to_owned(),
+                        background: ButtonBckg::Fill(Vec4::new(1.0, 1.0, 1.0, 0.1)),
+                    };
+                    Button {
+                        callback: |data| {
+                            data.state = GameState::Playing(PlayerInt::Human, PlayerInt::AI);
+                            data.board = Board::default();
+                            ai_new_game();
                         },
                         text: "Human v AI".to_owned(),
                         background: ButtonBckg::Fill(Vec4::new(1.0, 1.0, 1.0, 0.1)),
@@ -96,31 +106,56 @@ fn main_menu_gui() {
 }
 
 #[glui::builder(GameData)]
-fn board_gui(board: Board, active: bool) {
+fn board_gui(board: Board, active: bool, result: GameResult) {
     Square {
         children: {
             Image {
                 name: "images/board.jpg".to_owned(),
                 children: {
-                    GridLayout {
-                        col_widths: vec![1.0; MAP_SIZE],
-                        row_heights: vec![1.0; MAP_SIZE],
+                    Padding {
                         children: {
-                            let black_turn = board.next_color() == Cell::Black;
-                            let map = board.move_to_id_map();
-                            
-                            for n in 0..MAP_SIZE {
-                                for k in 0..MAP_SIZE {
-                                    let cell = board.cell(n,k);
-                                    let heat = board.heat[n][k];
-                                    if cell == Cell::Empty {
-                                        cell_gui(cell, (n, k), 0, black_turn, heat, active);
-                                    } else {
-                                        cell_gui(cell, (n, k), *map.get(&(n,k)).unwrap(), black_turn, heat, active);
+                            GridLayout {
+                                col_widths: vec![1.0; MAP_SIZE],
+                                row_heights: vec![1.0; MAP_SIZE],
+                                children: {
+                                    let black_turn = board.next_color() == Cell::Black;
+                                    let over = result.over();
+                                    let move_count = board.moves().len();
+                                    let map = board.move_to_id_map();
+                                    
+                                    for n in 0..MAP_SIZE {
+                                        for k in 0..MAP_SIZE {
+                                            let cell = board.cell(n,k);
+                                            let heat = board.heat[n][k];
+                                            
+                                            if cell == Cell::Empty {
+                                                cell_gui(cell, (n, k), false, 0, black_turn, heat, active);
+                                            } else {
+                                                let id = *map.get(&(n,k)).unwrap();
+                                                let mut highlighted = id == move_count || id+1 == move_count;
+                                                
+                                                if over {
+                                                    highlighted = false;
+                                                    match result.clone() {
+                                                        GameResult::BlackWon(pts) | GameResult::WhiteWon(pts) => {
+                                                            for p in pts {
+                                                                if p.0 == n && p.1 == k {
+                                                                    highlighted = true;
+                                                                }
+                                                            }
+                                                        }
+                                                        _ => {}
+                                                    }
+                                                }
+                                                
+                                                cell_gui(cell, (n, k), highlighted, id, black_turn, heat, active);
+                                            }
+                                        }
                                     }
-                                }
-                            }
+                                },
+                            };
                         },
+                        ..Padding::relative(1.0 / 32.0)
                     };
                 },
             };
@@ -129,12 +164,8 @@ fn board_gui(board: Board, active: bool) {
 }
 
 #[glui::builder(GameData)]
-fn cell_gui(cell: Cell, p: (usize, usize), n: usize, black_turn: bool, heat: f32, active: bool) {
+fn cell_gui(cell: Cell, p: (usize, usize), highlight: bool, n: usize, black_turn: bool, heat: f32, active: bool) {
     Padding {
-        left: 2.0,
-        right: 2.0,
-        top: 2.0,
-        bottom: 2.0,
         children: {
             Overlay {
                 color: Vec4::new(1.0,0.0,0.0,heat),
@@ -170,27 +201,30 @@ fn cell_gui(cell: Cell, p: (usize, usize), n: usize, black_turn: bool, heat: f32
                     };
                 }
                 Cell::White => {
-                    cell_img("images/white.png", Vec4::BLACK, n);
+                    cell_img(if highlight {"images/white_highlighted.png"} else {"images/white.png"}, Vec4::BLACK, n, !highlight);
                 }
                 Cell::Black => {
-                    cell_img("images/black.png", Vec4::WHITE, n);
+                    cell_img(if highlight {"images/black_highlighted.png"} else {"images/black.png"}, Vec4::WHITE, n, !highlight);
                 }
                 _ => {}
             }
         },
+        .. Padding::absolute(2.0)
     };
 }
 
 #[glui::builder(GameData)]
-fn cell_img(name: &str, clr: Vec4, n: usize) {
+fn cell_img(name: &str, clr: Vec4, n: usize, show_number: bool) {
     Image {
         name: name.to_owned(),
         children: {
-            Text {
-                text: format!("{}", n),
-                color: clr,
-                font_size: FontSize::relative_steps(0.5, (6.0, 32.0), 4.0),
-            };
+            if show_number {
+                Text {
+                    text: format!("{}", n),
+                    color: clr,
+                    font_size: FontSize::relative_steps(0.5, (6.0, 32.0), 4.0),
+                };
+            }
         },
     };
 }

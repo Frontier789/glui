@@ -1,7 +1,8 @@
 use super::bimap::BiMap;
-use super::*;
 use mecs::entity::Entity;
 use std::collections::HashMap;
+use super::component::*;
+use super::message::*;
 
 #[derive(Default)]
 pub struct StaticWorld {

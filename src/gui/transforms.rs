@@ -1,7 +1,9 @@
-use super::*;
 use std::any::Any;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use super::widget::*;
+use super::context::*;
+use tools::*;
 
 #[derive(Debug)]
 pub struct WidgetBuildCache {

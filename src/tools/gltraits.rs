@@ -222,3 +222,11 @@ pub fn gl_error_to_str(err: GLenum) -> &'static str {
         _ => "Unknown",
     }
 }
+
+pub fn gl_get_string(val: gl::types::GLenum) -> String {
+    unsafe {
+        std::str::from_utf8(std::ffi::CStr::from_ptr(gl::GetString(val) as *const i8).to_bytes())
+            .unwrap()
+            .to_owned()
+    }
+}

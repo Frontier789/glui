@@ -5,7 +5,7 @@ use super::Vec2;
 use super::gl::types::*;
 use super::image::io::Reader;
 use super::image::GenericImageView;
-use tools::image::buffer::ConvertBuffer;
+use super::image::buffer::ConvertBuffer;
 
 pub trait Texture {
     fn id(&self) -> u32;

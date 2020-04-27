@@ -15,11 +15,20 @@ use board::*;
 use gamestate::*;
 use ui::*;
 
+use std::fs::OpenOptions;
+use std::io::Write;
+
 fn main() {
     let mut w: World = World::new_win(Vec2::new(640.0, 480.0), "", Vec3::grey(0.1));
     
+    let rt = w.render_target().unwrap();
+    
+    if let Ok(mut file) = OpenOptions::new().create(true).open("ogl.txt") {
+        let _ = write!(file,"OpenGL version: {}",rt.gl_verison);
+    };
+    
     let mut gui = GuiContext::new(
-        w.render_target().unwrap(),
+        rt,
         true,
         game_gui,
         GameData {

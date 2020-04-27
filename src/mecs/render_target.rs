@@ -1,10 +1,17 @@
 use super::gl::types::*;
 use tools::*;
+use std::fmt;
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct GLVerion {
     major: usize,
     minor: usize,
+}
+
+impl fmt::Display for GLVerion {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}.{}", self.major, self.minor)
+    }
 }
 
 #[derive(Debug, Default, Copy, Clone, PartialEq)]

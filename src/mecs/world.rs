@@ -1,13 +1,25 @@
+extern crate gl;
 extern crate glutin;
 
 use self::glutin::platform::desktop::EventLoopExtDesktop;
-use super::*;
+use super::actor::*;
+use super::glutin_util::*;
+use super::glutin_cont::*;
+use super::glutin_win::*;
+use super::message;
+use super::message::*;
+use super::message_channel::*;
+use super::message_loop_data::*;
+use super::render_target::*;
+use super::static_world::*;
+use super::system::*;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::mem::swap;
 use std::sync::mpsc::*;
 use tools::*;
 
+#[derive(Default)]
 pub struct World {
     static_world: StaticWorld,
     systems: HashMap<SystemId, Box<dyn System>>,
@@ -29,27 +41,26 @@ impl World {
     pub fn new() -> World {
         let (sender, receiver) = channel();
         World {
-            static_world: Default::default(),
-            systems: Default::default(),
-            actors: Default::default(),
-            next_actor_id: 0,
             loop_data: MessageLoopData::HandRolled(sender, receiver),
-            ui_aware_actors: Default::default(),
+            ..Default::default()
         }
     }
     pub fn new_win(size: Vec2, title: &str, bgcolor: Vec3) -> World {
         World {
-            static_world: Default::default(),
-            systems: Default::default(),
-            actors: Default::default(),
-            next_actor_id: 0,
-            loop_data: MessageLoopData::Glutin(GlutinWindowData::new(size, title, bgcolor)),
-            ui_aware_actors: Default::default(),
+            loop_data: MessageLoopData::GlutinWindowed(GlutinWindowData::new(size, title, bgcolor)),
+            ..Default::default()
         }
+    }
+    pub fn new_winless(bgcolor: Vec3) -> Result<World,glutin::CreationError> {
+        Ok(World {
+            loop_data: MessageLoopData::GlutinWindowless(GlutinContextData::new(bgcolor)?),
+            ..Default::default()
+        })
     }
     pub fn render_target(&self) -> Option<RenderTarget> {
         match &self.loop_data {
-            MessageLoopData::Glutin(win) => Some(win.render_target()),
+            MessageLoopData::GlutinWindowed(win) => Some(win.render_target()),
+            MessageLoopData::GlutinWindowless(cont) => Some(cont.render_target()),
             _ => None,
         }
     }
@@ -126,7 +137,8 @@ impl World {
             MessageLoopData::HandRolled(sender, _receiver) => {
                 MessageChannel::from_sender(sender.clone())
             }
-            MessageLoopData::Glutin(win) => MessageChannel::from_window(&win),
+            MessageLoopData::GlutinWindowed(win) => MessageChannel::from_glutin(win.event_loop_proxy()),
+            MessageLoopData::GlutinWindowless(cont) => MessageChannel::from_glutin(cont.event_loop_proxy()),
             MessageLoopData::Consumed => {
                 panic!("Cannot give channel to consumed message loop data!")
             }
@@ -137,8 +149,11 @@ impl World {
             MessageLoopData::HandRolled(_, _) => {
                 self.owned_msg_loop();
             }
-            MessageLoopData::Glutin(_) => {
-                self.glutin_msg_loop();
+            MessageLoopData::GlutinWindowed(_) => {
+                self.glutin_win_msg_loop();
+            }
+            MessageLoopData::GlutinWindowless(_) => {
+                self.glutin_cont_msg_loop();
             }
             MessageLoopData::Consumed => {}
         }
@@ -175,11 +190,40 @@ impl World {
             self.static_world.send(id, UiEvent::from(event));
         }
     }
-    fn glutin_msg_loop(mut self) {
+    fn glutin_cont_msg_loop(mut self) {
         use self::glutin::event_loop::ControlFlow;
         let mut loop_data = MessageLoopData::Consumed;
         std::mem::swap(&mut loop_data, &mut self.loop_data);
-        if let MessageLoopData::Glutin(win) = loop_data {
+        
+        if let MessageLoopData::GlutinWindowless(data) = loop_data {
+            let (mut event_loop, _context, _bgcolor) = data.unpack();
+            
+            event_loop.run_return(move |event, _, control_flow| {
+                *control_flow = ControlFlow::Wait;
+                match event {
+                    glutin::event::Event::UserEvent(msg) => {
+                        if msg.target == MessageTarget::None {
+                            if msg.payload.is::<message::Exit>() {
+                                *control_flow = ControlFlow::Exit;
+                            }
+                        } else {
+                            self.static_world.send_annotated(msg);
+                        }
+                    }
+                    glutin::event::Event::MainEventsCleared => {
+                        self.send_to_ui_aware(ClonableUiEvent::EventsCleared);
+                        self.deliver_all_messages();
+                    }
+                    _ => (),
+                }
+            });
+        }
+    }
+    fn glutin_win_msg_loop(mut self) {
+        use self::glutin::event_loop::ControlFlow;
+        let mut loop_data = MessageLoopData::Consumed;
+        std::mem::swap(&mut loop_data, &mut self.loop_data);
+        if let MessageLoopData::GlutinWindowed(win) = loop_data {
             let (mut event_loop, win, bgcolor) = win.unpack();
             event_loop.run_return(move |event, _, control_flow| {
                 // println!("Event received {:?}", event);
@@ -199,16 +243,13 @@ impl World {
                                     _ => {}
                                 }
                             }
-                            glutin::event::WindowEvent::Resized(size) => {
-                                unsafe {
-                                    gl::Viewport(0, 0, size.width as i32, size.height as i32);
-                                }
+                            glutin::event::WindowEvent::Resized(size) => unsafe {
+                                gl::Viewport(0, 0, size.width as i32, size.height as i32);
                             },
                             _ => (),
                         }
                         self.send_event_to_ui_aware(event);
                         self.deliver_all_messages();
-                        
                         win.window().request_redraw();
                     }
                     glutin::event::Event::RedrawRequested(..) => {
