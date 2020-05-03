@@ -32,15 +32,20 @@ impl MessageChannel {
         T: Into<MessageTarget>,
         M: Message,
     {
+        self.send_annotated((target, message).into())
+    }
+
+    pub fn send_annotated(&self, msg: AnnotatedMessage) -> Result<(),AnnotatedMessage>
+    {
         match &self.implementation {
             ChannelImpl::HandRolled(sender) => {
-                match sender.send((target, message).into()) {
+                match sender.send(msg) {
                     Ok(_) => Ok(()),
                     Err(SendError(msg)) => Err(msg),
                 }
             },
             ChannelImpl::Glutin(proxy) => {
-                match proxy.send_event((target, message).into()) {
+                match proxy.send_event(msg) {
                     Ok(_) => Ok(()),
                     Err(glutin::event_loop::EventLoopClosed(msg)) => Err(msg),
                 }

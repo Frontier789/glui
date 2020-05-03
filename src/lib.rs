@@ -1,3 +1,5 @@
+extern crate alloc;
+
 #[macro_use]
 pub mod gui;
 pub mod mecs;

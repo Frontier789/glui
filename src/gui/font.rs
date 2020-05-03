@@ -17,6 +17,7 @@ use std::sync::Arc;
 use tools::RgbaTexture;
 use tools::Rect;
 use tools::Vec2;
+use gui::{Align, HAlign, VAlign};
 
 #[derive(Debug)]
 pub enum FontLoaderError {
@@ -113,7 +114,7 @@ impl FontLoader {
         Ok(rusttype::FontCollection::from_bytes(arc_data)?)
     }
     
-    pub fn font_family<'a>(&'a mut self, name: &str) -> Result<&'a mut Font, FontLoaderError> {
+    pub fn font_family(&mut self, name: &str) -> Result<&mut Font, FontLoaderError> {
         let name = &name.to_lowercase();
         if self.name_cache.contains_key(name) {
             let entry = &self.name_cache[name];
@@ -188,39 +189,6 @@ impl From<std::io::Error> for FontError {
 impl From<rusttype::Error> for FontError {
     fn from(e: rusttype::Error) -> FontError {
         FontError::RusttypeError(e)
-    }
-}
-
-#[derive(Debug,Copy,Clone,PartialEq,Eq)]
-pub enum HAlign {
-    Left,
-    Center,
-    Right,
-}
-
-#[derive(Debug,Copy,Clone,PartialEq,Eq)]
-pub enum VAlign {
-    Top,
-    Center,
-    Bottom,
-}
-
-#[derive(Debug,Copy,Clone,PartialEq,Eq)]
-pub struct Align {
-    pub horizontal: HAlign,
-    pub vertical: VAlign,
-}
-
-pub fn align(horizontal: HAlign,vertical: VAlign) -> Align {
-    Align{
-        horizontal,
-        vertical,
-    }
-}
-
-impl Default for Align {
-    fn default() -> Align {
-        align(HAlign::Center,VAlign::Center)
     }
 }
 

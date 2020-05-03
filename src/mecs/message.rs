@@ -31,7 +31,7 @@ where
 pub enum MessageTarget {
     System(SystemId),
     Actor(ActorId),
-    None,
+    Root,
 }
 
 impl From<SystemId> for MessageTarget {

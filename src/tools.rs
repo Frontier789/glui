@@ -1,24 +1,7 @@
 extern crate gl;
 extern crate image;
 
-pub mod buffer;
-pub mod camera;
-pub mod draw;
-pub mod gltraits;
-pub mod gpuclock;
-pub mod matrix4;
-pub mod mesh;
-pub mod profiler;
-pub mod rect;
-pub mod shader;
-pub mod shadererr;
-pub mod tex2d;
-pub mod vao;
-pub mod vector2;
-pub mod vector2px;
-pub mod vector3;
-pub mod vector4;
-mod match_downcast;
+pub use crate::match_downcast;
 
 pub use self::buffer::Buffer;
 pub use self::camera::Camera3D;
@@ -39,4 +22,23 @@ pub use self::vector2::Vec2;
 pub use self::vector2px::Vec2px;
 pub use self::vector3::Vec3;
 pub use self::vector4::Vec4;
-pub use crate::match_downcast;
+
+pub mod buffer;
+pub mod camera;
+pub mod draw;
+pub mod gltraits;
+pub mod gpuclock;
+pub mod matrix4;
+pub mod mesh;
+pub mod profiler;
+pub mod rect;
+pub mod shader;
+pub mod shadererr;
+pub mod tex2d;
+pub mod vao;
+pub mod vector2;
+pub mod vector2px;
+pub mod vector3;
+pub mod vector4;
+mod match_downcast;
+

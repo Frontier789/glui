@@ -5,6 +5,7 @@ use tools::*;
 use mecs::RenderTarget;
 
 use super::font;
+use gui::Align;
 
 pub struct DrawResources {
     shaders: HashMap<String, DrawShader>,
@@ -235,7 +236,7 @@ impl<'a> DrawBuilder<'a> {
             depth: self.offset.z,
         })
     }
-    pub fn add_text(&mut self, text: &str, font: &str, size: Vec2, clr: Vec4, align: font::Align, font_size: f32) {
+    pub fn add_text(&mut self, text: &str, font: &str, size: Vec2, clr: Vec4, align: Align, font_size: f32) {
         let font = self.draw_resources.fonts.font_family(&font).unwrap();
         let (bb_rects, uv_rects) = font.layout_paragraph(
             &text,

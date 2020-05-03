@@ -2,7 +2,7 @@
 **/*.rs.bk
 Cargo.lock
 metal_plate
-cache*
+_cache*
 .idea/
 test/gomoku/performance.txt
 test/gomoku/packed

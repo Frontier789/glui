@@ -92,6 +92,15 @@ impl World {
         self.actors.insert(id, Box::new(actor));
         id
     }
+    pub fn add_actor_with<F,A>(&mut self,fun: F) -> ActorId
+    where
+        F: FnOnce(ActorId) -> A,
+        A: Actor + 'static,
+    {
+        let id = self.next_actor_id();
+        self.actors.insert(id, Box::new(fun(id)));
+        id
+    }
     pub fn del_actor(&mut self, id: ActorId) {
         self.actors.remove(&id);
         self.ui_aware_actors.remove(&id);
@@ -128,7 +137,7 @@ impl World {
                         ))
                         .receive(msg.payload, &mut self.static_world);
                 }
-                MessageTarget::None => {}
+                MessageTarget::Root => {}
             }
         }
     }
@@ -165,10 +174,11 @@ impl World {
             let mut finished = false;
             while !finished {
                 let msg = receiver.recv().unwrap();
-                println!("msg loop got: {:?}", msg);
-                if msg.target == MessageTarget::None {
+                if msg.target == MessageTarget::Root {
                     if msg.payload.is::<message::Exit>() {
                         finished = true;
+                    } else {
+                        println!("Root got message {:?}", msg.payload);
                     }
                 } else {
                     self.static_world.send_annotated(msg);
@@ -177,7 +187,7 @@ impl World {
             }
         }
     }
-    fn send_event_to_ui_aware<'a>(&mut self, event: GlutinEvent<'a>) {
+    fn send_event_to_ui_aware(&mut self, event: GlutinEvent) {
         if let Some(event) = event.to_static() {
             for &id in &self.ui_aware_actors {
                 self.static_world
@@ -202,13 +212,7 @@ impl World {
                 *control_flow = ControlFlow::Wait;
                 match event {
                     glutin::event::Event::UserEvent(msg) => {
-                        if msg.target == MessageTarget::None {
-                            if msg.payload.is::<message::Exit>() {
-                                *control_flow = ControlFlow::Exit;
-                            }
-                        } else {
-                            self.static_world.send_annotated(msg);
-                        }
+                        self.handle_glutin_user_event(control_flow, msg);
                     }
                     glutin::event::Event::MainEventsCleared => {
                         self.send_to_ui_aware(ClonableUiEvent::EventsCleared);
@@ -219,6 +223,19 @@ impl World {
             });
         }
     }
+    fn handle_glutin_user_event(&mut self, control_flow: &mut GlutinControlFlow, msg: AnnotatedMessage) {
+        println!("User event: {:?}", msg);
+        if msg.target == MessageTarget::Root {
+            if msg.payload.is::<message::Exit>() {
+                *control_flow = GlutinControlFlow::Exit;
+            } else {
+                println!("Root got message {:?}", msg.payload);
+            }
+        } else {
+            self.static_world.send_annotated(msg);
+        }
+    }
+    
     fn glutin_win_msg_loop(mut self) {
         use self::glutin::event_loop::ControlFlow;
         let mut loop_data = MessageLoopData::Consumed;
@@ -262,13 +279,7 @@ impl World {
                         win.swap_buffers().unwrap();
                     }
                     glutin::event::Event::UserEvent(msg) => {
-                        if msg.target == MessageTarget::None {
-                            if msg.payload.is::<message::Exit>() {
-                                *control_flow = ControlFlow::Exit;
-                            }
-                        } else {
-                            self.static_world.send_annotated(msg);
-                        }
+                        self.handle_glutin_user_event(control_flow, msg);
                     }
                     glutin::event::Event::MainEventsCleared => {
                         self.send_to_ui_aware(ClonableUiEvent::EventsCleared);

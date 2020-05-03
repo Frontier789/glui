@@ -1,6 +1,27 @@
 extern crate bimap;
 extern crate gl;
-extern crate glui;
+extern crate glui_proc;
+
+pub use self::actor::Actor;
+pub use self::actor::ActorId;
+pub use self::component::Component;
+pub use self::entity::Entity;
+pub use self::glui_proc::Component;
+pub use self::glutin_cont::GlutinContextData;
+pub use self::glutin_util::GlutinButton;
+pub use self::glutin_util::GlutinEvent;
+pub use self::glutin_util::GlutinKey;
+pub use self::glutin_win::GlutinWindowData;
+pub use self::message::AnnotatedMessage;
+pub use self::message::Message;
+pub use self::message::MessageTarget;
+pub use self::message_channel::MessageChannel;
+pub use self::message_loop_data::MessageLoopData;
+pub use self::render_target::RenderTarget;
+pub use self::static_world::StaticWorld;
+pub use self::system::System;
+pub use self::system::SystemId;
+pub use self::world::World;
 
 pub mod actor;
 pub mod component;
@@ -16,24 +37,3 @@ pub mod message_channel;
 pub mod message_loop_data;
 pub mod static_world;
 
-pub use self::actor::Actor;
-pub use self::actor::ActorId;
-pub use self::component::Component;
-pub use self::entity::Entity;
-pub use self::glutin_util::GlutinButton;
-pub use self::glutin_util::GlutinEvent;
-pub use self::glutin_util::GlutinKey;
-pub use self::glutin_win::GlutinWindowData;
-pub use self::glutin_cont::GlutinContextData;
-pub use self::message::Message;
-pub use self::message::MessageTarget;
-pub use self::message::AnnotatedMessage;
-pub use self::message_channel::MessageChannel;
-pub use self::message_loop_data::MessageLoopData;
-pub use self::render_target::RenderTarget;
-pub use self::system::System;
-pub use self::system::SystemId;
-pub use self::static_world::StaticWorld;
-pub use self::world::World;
-
-pub use self::glui::Component;

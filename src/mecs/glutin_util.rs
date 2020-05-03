@@ -6,6 +6,7 @@ pub type GlutinButton = glutin::event::MouseButton;
 pub type GlutinEvent<'a> = glutin::event::WindowEvent<'a>;
 
 pub(super) type GlutinGLContext = glutin::Context<glutin::PossiblyCurrent>;
+pub(super) type GlutinControlFlow = glutin::event_loop::ControlFlow;
 pub(super) type GlutinGLContextNC = glutin::Context<glutin::NotCurrent>;
 pub(super) type GlutinGLWindow =
     glutin::ContextWrapper<glutin::PossiblyCurrent, glutin::window::Window>;

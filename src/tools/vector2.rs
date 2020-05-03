@@ -59,6 +59,14 @@ impl Vec2 {
             self.y
         }
     }
+
+    pub fn maxxy(&self) -> f32 {
+        if self.x > self.y {
+            self.x
+        } else {
+            self.y
+        }
+    }
     
     pub fn unsign(&self) -> Self {
         Vec2::new(

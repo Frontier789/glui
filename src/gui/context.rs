@@ -3,7 +3,7 @@ use mecs::*;
 use std::path::Path;
 use super::draw::*;
 use super::widget::*;
-use super::transforms::*;
+use super::widget_layout_builder::*;
 use tools::*;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -31,6 +31,7 @@ pub struct GuiContext<D> {
     build_data: D,
     cb_executor: CallbackExecutor,
     widget_builder: Box<dyn Fn(D)>,
+    msg_channel: MessageChannel,
 }
 
 impl<D> Actor for GuiContext<D>
@@ -38,22 +39,20 @@ where
     D: PartialEq + Clone + 'static,
 {
     fn receive(&mut self, msg: Box<dyn Message>, world: &mut StaticWorld) {
-        // println!("context got: {:?}",msg);
+        // println!("context got: {:?}",_msg);
         match_downcast!( msg {
             ui_event : UiEvent => {
                 match ui_event {
                     UiEvent::GlutinEvent(ev) => {
-                        self.handle_event(ev);
+                        self.translate_event(ev);
                     },
                     UiEvent::Redraw => {
                         self.render();
                     },
                     UiEvent::EventsCleared => {
                         self.actualize_data();
-                        if !self.cb_executor.sender.messages.is_empty() {
-                            for message in self.cb_executor.sender.messages.drain(0..) {
-                                world.send_annotated(message);
-                            }
+                        for message in self.cb_executor.sender.drain_messages() {
+                            world.send_annotated(message);
                         }
                     },
                 }
@@ -72,6 +71,7 @@ where
         profile: bool,
         widget_builder: F,
         build_data: D,
+        msg_channel: MessageChannel,
     ) -> GuiContext<D>
     where
         F: Fn(D) + 'static,
@@ -94,6 +94,7 @@ where
             build_data: build_data.clone(),
             cb_executor: CallbackExecutor { data: Box::new(build_data), sender: PostBox::new() },
             widget_builder: Box::new(widget_builder),
+            msg_channel,
         }
     }
     pub fn init_gl_res(&mut self) {
@@ -289,7 +290,7 @@ where
         rseq.execute(&mut self.draw_res);
         self.profiler.end_gpu();
     }
-    fn handle_event(&mut self, event: GlutinEvent) {
+    fn translate_event(&mut self, event: GlutinEvent) {
         match event {
             GlutinEvent::Resized(size) => {
                 self.resized(size.into());
@@ -335,6 +336,7 @@ where
 }
 
 use std::fs::OpenOptions;
+use gui::{WidgetParser, CallbackExecutor, PostBox};
 
 impl<D> Drop for GuiContext<D> {
     fn drop(&mut self) {
@@ -349,22 +351,5 @@ impl<D> Drop for GuiContext<D> {
 
             self.profiler.print(&mut file).unwrap();
         }
-    }
-}
-
-pub struct PostBox {
-    messages: Vec<AnnotatedMessage>,
-}
-
-impl PostBox {
-    pub fn new() -> Self {
-        PostBox { messages: vec![] }
-    }
-    pub fn send<T, M>(&mut self, target: T, msg: M)
-    where
-        T: Into<MessageTarget>,
-        M: Message,
-    {
-        self.messages.push((target, msg).into());
     }
 }

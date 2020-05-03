@@ -55,6 +55,14 @@ impl Vec2px {
             self.y
         }
     }
+
+    pub fn maxxy(&self) -> f32 {
+        if self.x > self.y {
+            self.x
+        } else {
+            self.y
+        }
+    }
     
     pub fn dot(&self, v: Self) -> f32 {
         self.x * v.x + self.y * v.y

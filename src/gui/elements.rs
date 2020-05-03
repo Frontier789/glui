@@ -1,9 +1,10 @@
 use std::f32::consts::PI;
 use super::draw::*;
 use super::widget::*;
-use super::transforms::*;
+use super::align::*;
 use tools::*;
-use super::font;
+use gui::{GuiCallback, CallbackExecutor, WidgetParser, WidgetAdder};
+use std::ops::{Neg, Shr};
 
 #[derive(Default)]
 pub struct VertLayoutPriv {
@@ -16,20 +17,21 @@ pub struct VertLayout {
     pub private: VertLayoutPriv,
 }
 
+impl_widget_building_for!(VertLayout);
 impl Widget for VertLayout {
     fn constraint(&mut self, self_constraint: WidgetConstraints) {
         self.private.size.x = self_constraint.max_size.x;
     }
-    fn child_constraint(&self) -> Option<WidgetConstraints> {
-        Some(WidgetConstraints {
-            max_size: Vec2px::new(self.private.size.x, std::f32::INFINITY),
-        })
-    }
-
     fn place_child(&mut self, child_size: Vec2px, _child_descent: f32) -> WidgetPosition {
         let y = self.private.size.y;
         self.private.size.y += child_size.y + self.padding.y;
         Vec2px::new(0.0, y).into()
+    }
+
+    fn child_constraint(&self) -> Option<WidgetConstraints> {
+        Some(WidgetConstraints {
+            max_size: Vec2px::new(self.private.size.x, std::f32::INFINITY),
+        })
     }
 
     fn size(&self) -> Vec2px {
@@ -75,24 +77,11 @@ pub struct FixedPanel {
     pub private: PanelPrivate,
 }
 
+impl_widget_building_for!(FixedPanel);
 impl Widget for FixedPanel {
     fn constraint(&mut self, self_constraint: WidgetConstraints) {
         self.private.total_size = self_constraint.max_size;
     }
-    fn child_constraint(&self) -> Option<WidgetConstraints> {
-        match self.private.child_id {
-            0 => Some(WidgetConstraints {
-                max_size: self.occupied_size(false),
-            }),
-            1 => Some(WidgetConstraints {
-                max_size: self.private.total_size - self.occupied_size(true),
-            }),
-            _ => Some(WidgetConstraints {
-                max_size: Vec2px::zero(),
-            }),
-        }
-    }
-
     fn place_child(&mut self, _child_size: Vec2px, _child_descent: f32) -> WidgetPosition {
         let ci = self.private.child_id;
         self.private.child_id += 1;
@@ -110,6 +99,20 @@ impl Widget for FixedPanel {
             _ => Vec2px::zero(),
         }
         .into()
+    }
+
+    fn child_constraint(&self) -> Option<WidgetConstraints> {
+        match self.private.child_id {
+            0 => Some(WidgetConstraints {
+                max_size: self.occupied_size(false),
+            }),
+            1 => Some(WidgetConstraints {
+                max_size: self.private.total_size - self.occupied_size(true),
+            }),
+            _ => Some(WidgetConstraints {
+                max_size: Vec2px::zero(),
+            }),
+        }
     }
 
     fn size(&self) -> Vec2px {
@@ -148,6 +151,7 @@ pub struct GridLayout {
     pub private: GridLayoutPrivate,
 }
 
+impl_widget_building_for!(GridLayout);
 impl Widget for GridLayout {
     fn constraint(&mut self, self_constraint: WidgetConstraints) {
         self.private.real_size = self.size.to_units(self_constraint.max_size);
@@ -163,18 +167,6 @@ impl Widget for GridLayout {
         self.private.row_heights = self.row_heights.iter().map(|h| h * sh).collect();
         self.private.col_widths = self.col_widths.iter().map(|w| w * sw).collect();
     }
-    fn size(&self) -> Vec2px {
-        self.private.real_size
-    }
-    fn child_constraint(&self) -> Option<WidgetConstraints> {
-        Some(WidgetConstraints {
-            max_size: Vec2px::new(
-                self.private.col_widths[self.private.child_id % self.col_widths.len()],
-                self.private.row_heights[self.private.child_id / self.col_widths.len()],
-            ),
-        })
-    }
-
     fn place_child(&mut self, _child_size: Vec2px, _child_descent: f32) -> WidgetPosition {
         let p = self.private.child_pos;
 
@@ -188,6 +180,18 @@ impl Widget for GridLayout {
         }
         self.private.child_id += 1;
         p.into()
+    }
+    fn child_constraint(&self) -> Option<WidgetConstraints> {
+        Some(WidgetConstraints {
+            max_size: Vec2px::new(
+                self.private.col_widths[self.private.child_id % self.col_widths.len()],
+                self.private.row_heights[self.private.child_id / self.col_widths.len()],
+            ),
+        })
+    }
+
+    fn size(&self) -> Vec2px {
+        self.private.real_size
     }
 }
 
@@ -229,19 +233,11 @@ pub struct Padding {
     pub private: PaddingPrivate,
 }
 
+impl_widget_building_for!(Padding);
 impl Widget for Padding {
     fn constraint(&mut self, self_constraint: WidgetConstraints) {
         self.private.all_size = self_constraint.max_size;
     }
-    fn size(&self) -> Vec2px {
-        self.private.all_size
-    }
-    fn child_constraint(&self) -> Option<WidgetConstraints> {
-        Some(WidgetConstraints {
-            max_size: self.size() - self.pad_size(),
-        })
-    }
-
     fn place_child(&mut self, child_size: Vec2px, child_descent: f32) -> WidgetPosition {
         let s = self.size();
         let sd = self.private.stacking_depth;
@@ -257,6 +253,15 @@ impl Widget for Padding {
             ) - child_size / 2.0,
             sd,
         )
+    }
+    fn child_constraint(&self) -> Option<WidgetConstraints> {
+        Some(WidgetConstraints {
+            max_size: self.size() - self.pad_size(),
+        })
+    }
+
+    fn size(&self) -> Vec2px {
+        self.private.all_size
     }
 }
 
@@ -329,7 +334,7 @@ pub struct Text {
     pub text: String,
     pub color: Vec4,
     pub size: WidgetSize,
-    pub align: font::Align,
+    pub align: Align,
     pub font: String,
     pub font_size: FontSize,
     pub private: TextPrivate,
@@ -349,12 +354,10 @@ impl Default for Text {
     }
 }
 
+impl_widget_building_for!(Text);
 impl Widget for Text {
     fn constraint(&mut self, self_constraint: WidgetConstraints) {
         self.private.real_size = self.size.to_units(self_constraint.max_size);
-    }
-    fn size(&self) -> Vec2px {
-        self.private.real_size
     }
     fn on_draw_build(&self, builder: &mut DrawBuilder) {
         builder.add_text(
@@ -365,6 +368,9 @@ impl Widget for Text {
             self.align,
             self.font_size.to_pixels(self.size().minxy(), 1.0),
         );
+    }
+    fn size(&self) -> Vec2px {
+        self.private.real_size
     }
 }
 
@@ -421,12 +427,10 @@ impl Default for Button {
     }
 }
 
+impl_widget_building_for!(Button);
 impl Widget for Button {
     fn constraint(&mut self, self_constraint: WidgetConstraints) {
         self.private.real_size = self.size.to_units(self_constraint.max_size);
-    }
-    fn size(&self) -> Vec2px {
-        self.private.real_size
     }
     fn expand(&self) -> Vec<Box<dyn Widget>> {
         vec![Box::new(Text {
@@ -436,6 +440,23 @@ impl Widget for Button {
             font_size: self.font_size,
             ..Default::default()
         })]
+    }
+    fn on_press(&mut self, _executor: &mut CallbackExecutor) -> EventResponse {
+        self.private.state = ButtonState::Pressed;
+        EventResponse::HandledRedraw
+    }
+    fn on_release(&mut self, executor: &mut CallbackExecutor) -> EventResponse {
+        executor.execute(&self.callback, self);
+        self.private.state = ButtonState::Hovered;
+        EventResponse::HandledRedraw
+    }
+    fn on_cursor_enter(&mut self, _executor: &mut CallbackExecutor) -> EventResponse {
+        self.private.state = ButtonState::Hovered;
+        EventResponse::HandledRedraw
+    }
+    fn on_cursor_leave(&mut self, _executor: &mut CallbackExecutor) -> EventResponse {
+        self.private.state = ButtonState::Normal;
+        EventResponse::HandledRedraw
     }
     fn on_draw_build(&self, builder: &mut DrawBuilder) {
         let clr = match self.background {
@@ -498,13 +519,60 @@ impl Widget for Button {
             ButtonBckg::None => {}
         }
     }
-    fn on_release(&mut self, executor: &mut CallbackExecutor) -> EventResponse {
-        executor.execute(&self.callback);
-        self.private.state = ButtonState::Hovered;
-        EventResponse::HandledRedraw
+    fn size(&self) -> Vec2px {
+        self.private.real_size
+    }
+}
+
+#[derive(Default)]
+pub struct TogglePrivate {
+    state: ButtonState,
+    real_size: Vec2px,
+}
+
+pub struct Toggle {
+    pub on: bool,
+    pub size: WidgetSize,
+    pub on_text: String,
+    pub off_text: String,
+    pub text_color: Vec4,
+    pub font: String,
+    pub font_size: FontSize,
+    pub background: ButtonBckg,
+    pub callback: GuiCallback,
+    pub private: TogglePrivate,
+}
+
+impl Default for Toggle {
+    fn default() -> Toggle {
+        Toggle {
+            on: false,
+            size: Default::default(),
+            on_text: Default::default(),
+            off_text: Default::default(),
+            text_color: Vec4::WHITE,
+            font: Default::default(),
+            font_size: Default::default(),
+            background: ButtonBckg::Fill(Vec4::grey(0.1)),
+            callback: Default::default(),
+            private: Default::default(),
+        }
+    }
+}
+
+impl_widget_building_for!(Toggle);
+impl Widget for Toggle {
+    fn constraint(&mut self, self_constraint: WidgetConstraints) {
+        self.private.real_size = self.size.to_units(self_constraint.max_size);
     }
     fn on_press(&mut self, _executor: &mut CallbackExecutor) -> EventResponse {
         self.private.state = ButtonState::Pressed;
+        EventResponse::HandledRedraw
+    }
+    fn on_release(&mut self, executor: &mut CallbackExecutor) -> EventResponse {
+        self.on = !self.on;
+        executor.execute(&self.callback, self);
+        self.private.state = ButtonState::Hovered;
         EventResponse::HandledRedraw
     }
     fn on_cursor_enter(&mut self, _executor: &mut CallbackExecutor) -> EventResponse {
@@ -514,6 +582,79 @@ impl Widget for Button {
     fn on_cursor_leave(&mut self, _executor: &mut CallbackExecutor) -> EventResponse {
         self.private.state = ButtonState::Normal;
         EventResponse::HandledRedraw
+    }
+    fn on_draw_build(&self, builder: &mut DrawBuilder) {
+        let clr = match self.background {
+            ButtonBckg::Cirlce(c) | ButtonBckg::Fill(c) | ButtonBckg::RoundRect(c, _) => {
+                let intensity = c.intensity();
+                let bckg_clr_direction = if intensity < 0.5 {
+                    Vec4::new(1.0, 1.0, 1.0, c.w)
+                } else {
+                    Vec4::new(0.0, 0.0, 0.0, c.w)
+                };
+                let bckg_clr = match self.private.state {
+                    ButtonState::Normal => c,
+                    ButtonState::Hovered => {
+                        c * Vec4::grey(0.9) + bckg_clr_direction * Vec4::grey(0.1)
+                    }
+                    ButtonState::Pressed => {
+                        c * Vec4::grey(0.95) + bckg_clr_direction * Vec4::grey(0.05)
+                    }
+                };
+                bckg_clr
+            }
+            ButtonBckg::Image(_, c_normal, c_hovered, c_pressed) => match self.private.state {
+                ButtonState::Normal => c_normal,
+                ButtonState::Hovered => c_hovered,
+                ButtonState::Pressed => c_pressed,
+            },
+            ButtonBckg::None => {
+                return;
+            }
+        };
+        let size = self.size().to_pixels(1.0);
+        match self.background.clone() {
+            ButtonBckg::Cirlce(_) => {
+                let radius = size.minxy();
+                let offset = size / 2.0;
+                let cirlce = |r| Vec2::pol(radius, r * PI * 2.0) + size / 2.0 + offset;
+                builder.add_clr_convex(cirlce, clr, (radius * 2.0 * PI).floor() as usize, true);
+            }
+            ButtonBckg::Fill(_) => {
+                builder.add_clr_rect(Rect::from_min_max(Vec2::origin(), size), clr);
+            }
+            ButtonBckg::RoundRect(_, radius) => {
+                let round_rect = |r| {
+                    let s = size / 2.0 - Vec2::new_xy(radius);
+
+                    let circle_mid = size / 2.0
+                        + match r {
+                            x if x < 0.25 => s,
+                            x if x < 0.5 => s * Vec2::new(-1.0, 1.0),
+                            x if x < 0.75 => s * Vec2::new(-1.0, -1.0),
+                            _ => s * Vec2::new(1.0, -1.0),
+                        };
+                    Vec2::pol(radius, r * PI * 2.0) + circle_mid
+                };
+                builder.add_clr_convex(round_rect, clr, (radius * 2.0 * PI).floor() as usize, true);
+            }
+            ButtonBckg::Image(name, _, _, _) => {
+                builder.add_tex_rect(Rect::from_min_max(Vec2::origin(), size), &name, clr);
+            }
+            ButtonBckg::None => {}
+        }
+        
+        builder.add_text(
+            if self.on {&self.on_text} else {&self.off_text},
+            &self.font,
+            self.size().to_pixels(1.0),
+            self.text_color,
+            Default::default(),
+            self.font_size.to_pixels(self.size().minxy(), 1.0),
+        );
+    }
+    fn size(&self) -> Vec2px {
+        self.private.real_size
     }
 }
 
@@ -529,12 +670,10 @@ pub struct Image {
     pub private: ImagePrivate,
 }
 
+impl_widget_building_for!(Image);
 impl Widget for Image {
     fn constraint(&mut self, self_constraint: WidgetConstraints) {
         self.private.real_size = self.size.to_units(self_constraint.max_size);
-    }
-    fn size(&self) -> Vec2px {
-        self.private.real_size
     }
     fn on_draw_build(&self, builder: &mut DrawBuilder) {
         let size = self.size().to_pixels(1.0);
@@ -543,6 +682,9 @@ impl Widget for Image {
             &self.name,
             Vec4::WHITE,
         );
+    }
+    fn size(&self) -> Vec2px {
+        self.private.real_size
     }
 }
 
@@ -558,15 +700,11 @@ pub struct Square {
     pub private: SquarePrivate,
 }
 
+impl_widget_building_for!(Square);
 impl Widget for Square {
     fn constraint(&mut self, self_constraint: WidgetConstraints) {
         self.private.outer_size = self_constraint.max_size;
         self.private.inner_size = Vec2px::new_xy(self_constraint.max_size.minxy());
-    }
-    fn child_constraint(&self) -> Option<WidgetConstraints> {
-        Some(WidgetConstraints {
-            max_size: self.private.inner_size,
-        })
     }
     fn place_child(&mut self, child_size: Vec2px, child_descent: f32) -> WidgetPosition {
         let sd = self.private.stacking_depth;
@@ -574,9 +712,49 @@ impl Widget for Square {
 
         WidgetPosition::new(self.private.outer_size * 0.5 - child_size * 0.5, sd)
     }
+    fn child_constraint(&self) -> Option<WidgetConstraints> {
+        Some(WidgetConstraints {
+            max_size: self.private.inner_size,
+        })
+    }
 
     fn size(&self) -> Vec2px {
         self.private.outer_size
+    }
+}
+
+#[derive(Default)]
+pub struct OuterSquarePrivate {
+    inner_size: Vec2px,
+    outer_size: Vec2px,
+    stacking_depth: f32,
+}
+
+#[derive(Default)]
+pub struct OuterSquare {
+    pub private: OuterSquarePrivate,
+}
+
+impl_widget_building_for!(OuterSquare);
+impl Widget for OuterSquare {
+    fn constraint(&mut self, self_constraint: WidgetConstraints) {
+        self.private.inner_size = self_constraint.max_size;
+        self.private.outer_size = Vec2px::new_xy(self_constraint.max_size.maxxy());
+    }
+    fn place_child(&mut self, child_size: Vec2px, child_descent: f32) -> WidgetPosition {
+        let sd = self.private.stacking_depth;
+        self.private.stacking_depth += child_descent;
+
+        WidgetPosition::new(self.private.inner_size * 0.5 - child_size * 0.5, sd)
+    }
+    fn child_constraint(&self) -> Option<WidgetConstraints> {
+        Some(WidgetConstraints {
+            max_size: self.private.inner_size,
+        })
+    }
+
+    fn size(&self) -> Vec2px {
+        self.private.inner_size
     }
 }
 
@@ -602,14 +780,10 @@ impl Default for Overlay {
     }
 }
 
+impl_widget_building_for!(Overlay);
 impl Widget for Overlay {
     fn constraint(&mut self, self_constraint: WidgetConstraints) {
         self.private.size = self_constraint.max_size;
-    }
-    fn child_constraint(&self) -> Option<WidgetConstraints> {
-        Some(WidgetConstraints {
-            max_size: self.private.size,
-        })
     }
     fn place_child(&mut self, child_size: Vec2px, child_descent: f32) -> WidgetPosition {
         let sd = self.private.stacking_depth;
@@ -617,12 +791,17 @@ impl Widget for Overlay {
 
         WidgetPosition::new(self.private.size * 0.5 - child_size * 0.5, sd)
     }
-
-    fn size(&self) -> Vec2px {
-        self.private.size
+    fn child_constraint(&self) -> Option<WidgetConstraints> {
+        Some(WidgetConstraints {
+            max_size: self.private.size,
+        })
     }
+
     fn on_draw_build(&self, builder: &mut DrawBuilder) {
         let size = self.size().to_pixels(1.0);
         builder.add_clr_rect(Rect::from_min_max(Vec2::origin(), size), self.color);
+    }
+    fn size(&self) -> Vec2px {
+        self.private.size
     }
 }

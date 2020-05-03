@@ -1,29 +1,30 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 extern crate gl;
-extern crate glui;
+extern crate glui_proc;
 extern crate glutin;
 extern crate image;
+
+use std::any::Any;
+use std::ops::Index;
+use std::os::raw::c_char;
+use std::time::Instant;
+
+use gl::types::*;
+
+use gui::*;
+use gui::elements::*;
+use mecs::*;
+use tools::*;
+use tools::camera::Camera;
 
 #[macro_use]
 mod gui;
 mod mecs;
 mod tools;
 
-use gl::types::*;
-use std::any::Any;
-use std::ops::Index;
-use std::time::Instant;
-use tools::camera::Camera;
-use tools::*;
-
-use gui::elements::*;
-use gui::*;
-use mecs::*;
-
-use std::os::raw::c_char;
 extern "C" {
-    fn puts(s: *const c_char);
+	fn puts(s: *const c_char);
 }
 
 // TODOs
@@ -42,55 +43,74 @@ extern "C" {
 
 #[derive(Clone, Debug, PartialEq)]
 struct Data {
-    goat: i32,
-    shown: String,
+	goat: i32,
+	shown: String,
+	show_red: bool,
 }
 
-#[glui::builder(Data)]
 fn experimental(param: Data) {
-    FixedPanel {
-        size: 50.0,
-        children: {
-            Padding {
-                left: PaddingValue::Units(20.0),
-                children: {
-                    Text {
-                        text: param.shown.clone(),
-                        font: "arial".to_owned(),
-                        align: font::align(HAlign::Left, VAlign::Center),
-                        color: Vec4::RED,
-                    };
-                },
-            };
-            GridLayout {
-                col_widths: vec![1.0; 5],
-                row_heights: vec![1.0; 5],
-                children: {
-                    for i in 0..25 {
-                        let text = format!("{}", i + param.goat);
-                        mybutton(text);
-                    }
-                },
-            };
-        },
-    };
-}
+	-Button {
+		text: "HY".to_owned(),
+		..Default::default()
+	};
+	
+	// -FixedPanel {
+	// 	size: 50.0,
+	// 	..Default::default()
+	// } >> {
+		// -Padding {
+		// 	left: PaddingValue::Units(20.0),
+		// 	..Default::default()
+		// } >>
+		// 	-Text {
+		// 		text: param.shown.clone(),
+		// 		font: "arial".to_owned(),
+		// 		align: Align::from(HAlign::Left, VAlign::Center),
+		// 		color: if param.show_red { Vec4::RED } else { Vec4::BLUE },
+		// 		..Default::default()
+		// 	};
 
-#[glui::builder(Data)]
-pub fn mybutton(text: String) {
-    Padding {
-        children: {
-            Button {
-                text: text.clone(),
-                callback: |data| {
-                    data.shown += &text;
-                },
-                background: ButtonBckg::RoundRect(Vec4::grey(0.1), 6.0),
-            };
-        },
-        ..Padding::absolute(10.0)
-    };
+		// -GridLayout {
+		// 	col_widths: vec![1.0; 5],
+		// 	row_heights: vec![1.0; 5],
+		// 		..Default::default()
+		// } >> {
+		// 	for i in 0..20 {
+		// 		let text = format!("{}", i + param.goat);
+		// 		// mybutton(text, i == 13);
+		// 	}
+		// 	-Toggle {
+		// 		on: param.show_red,
+		// 		on_text: "ON".to_owned(),
+		// 		off_text: "OFF".to_owned(),
+		// 		// callback: |data, button| {
+		// 		//     data.show_red = button.on;
+		// 		// },
+		// 		..Default::default()
+		// 	};
+		// };
+	// };
+	println!("END");
 }
+//
+// #[glui::builder(Data)]
+// pub fn mybutton(text: String, exitter: bool) {
+//     Padding {
+//         children: {
+//             Button {
+//                 text: text.clone(),
+//                 callback: |data, _button, sender| {
+//                     data.shown += &text;
+//                     if exitter {
+//                         sender.send(MessageTarget::Root, message::Exit{});
+//                     }
+//                 },
+//                 background: ButtonBckg::RoundRect(Vec4::grey(0.1), 6.0),
+//             };
+//         },
+//         ..Padding::absolute(10.0)
+//     };
+// }
 
 //
 // Model:
@@ -102,24 +122,24 @@ pub fn mybutton(text: String) {
 //
 
 fn main() {
-    let mut w: World = World::new_win(Vec2::new(640.0, 480.0), "", Vec3::grey(0.04));
-    
-    println!("hy");
-
-    let mut gui = GuiContext::new(
-        w.render_target().unwrap(),
-        true,
-        experimental,
-        Data {
-            goat: 0,
-            shown: "".to_owned(),
-        },
-    );
-    gui.init_gl_res();
-    gui.rebuild_gui();
-    let id = w.add_actor(gui);
-    w.make_actor_ui_aware(id);
-    w.run();
+	let mut w: World = World::new_win(Vec2::new(640.0, 480.0), "", Vec3::grey(0.04));
+	
+	let mut gui = GuiContext::new(
+		w.render_target().unwrap(),
+		true,
+		experimental,
+		Data {
+			goat: 0,
+			shown: "".to_owned(),
+			show_red: true,
+		},
+		w.channel(),
+	);
+	gui.init_gl_res();
+	gui.rebuild_gui();
+	let id = w.add_actor(gui);
+	w.make_actor_ui_aware(id);
+	w.run();
 }
 
 // #![allow(dead_code)]
