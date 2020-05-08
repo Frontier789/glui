@@ -1,10 +1,12 @@
 extern crate downcast_rs;
-use self::downcast_rs::impl_downcast;
-use self::downcast_rs::Downcast;
+
+use tools::*;
 
 use super::CallbackExecutor;
 use super::DrawBuilder;
-use tools::*;
+
+use self::downcast_rs::impl_downcast;
+use self::downcast_rs::Downcast;
 
 #[derive(Copy, Clone)]
 pub enum GuiDimension {
@@ -44,12 +46,39 @@ impl Default for WidgetSize {
     }
 }
 
+impl From<Vec2px> for WidgetSize {
+    fn from(s: Vec2px) -> Self {
+        WidgetSize {
+            x: GuiDimension::Units(s.x),
+            y: GuiDimension::Units(s.y),
+        }
+    }
+}
+
 impl WidgetSize {
     pub fn to_units(&self, container_size: Vec2px) -> Vec2px {
         Vec2px::new(
             self.x.to_units(container_size.x),
             self.y.to_units(container_size.y),
         )
+    }
+    pub fn from_units(units: Vec2) -> Self {
+        Self {
+            x: GuiDimension::Units(units.x),
+            y: GuiDimension::Units(units.y),
+        }
+    }
+    pub fn relative(ratio: Vec2) -> Self {
+        Self {
+            x: GuiDimension::Relative(ratio.x),
+            y: GuiDimension::Relative(ratio.y),
+        }
+    }
+    pub fn fill() -> Self {
+        WidgetSize {
+            x: GuiDimension::Relative(1.0),
+            y: GuiDimension::Relative(1.0),
+        }
     }
 }
 
@@ -102,19 +131,26 @@ pub trait Widget: Downcast {
         None
     }
 
-    fn on_press(&mut self, _executor: &mut CallbackExecutor) -> EventResponse {
+    fn on_press(&mut self, _executor: CallbackExecutor) -> EventResponse {
         EventResponse::Pass
     }
-    fn on_release(&mut self, _executor: &mut CallbackExecutor) -> EventResponse {
+    fn on_release(&mut self, _executor: CallbackExecutor) -> EventResponse {
         EventResponse::Pass
     }
-    fn on_cursor_enter(&mut self, _executor: &mut CallbackExecutor) -> EventResponse {
+    fn on_cursor_enter(&mut self, _executor: CallbackExecutor) -> EventResponse {
         EventResponse::Pass
     }
-    fn on_cursor_leave(&mut self, _executor: &mut CallbackExecutor) -> EventResponse {
+    fn on_cursor_leave(&mut self, _executor: CallbackExecutor) -> EventResponse {
         EventResponse::Pass
     }
     fn on_draw_build(&self, _builder: &mut DrawBuilder) {}
     fn size(&self) -> Vec2px;
 }
+
 impl_downcast!(Widget);
+
+impl Widget for () {
+    fn size(&self) -> Vec2px {
+        Vec2px::zero()
+    }
+}

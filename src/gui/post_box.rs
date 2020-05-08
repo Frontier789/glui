@@ -2,7 +2,7 @@ use mecs::{AnnotatedMessage, MessageTarget, Message};
 use std::vec::Drain;
 
 pub struct PostBox {
-    messages: Vec<AnnotatedMessage>,
+    pub(super) messages: Vec<AnnotatedMessage>,
 }
 
 impl PostBox {

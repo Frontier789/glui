@@ -1,10 +1,14 @@
+use std::fs::OpenOptions;
+use std::path::Path;
+
+use gui::{GenericCallbackExecutor, GuiBuilder, PostBox, WidgetParser};
 use mecs::world::UiEvent;
 use mecs::*;
-use std::path::Path;
+use tools::*;
+
 use super::draw::*;
 use super::widget::*;
 use super::widget_layout_builder::*;
-use tools::*;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum GrabState {
@@ -13,7 +17,10 @@ enum GrabState {
     GrabbedOutside,
 }
 
-pub struct GuiContext<D> {
+pub struct GuiContext<D>
+where
+    D: GuiBuilder + 'static,
+{
     render_target: RenderTarget,
     draw_res: DrawResources,
     widgets: Vec<Box<dyn Widget + 'static>>,
@@ -28,54 +35,42 @@ pub struct GuiContext<D> {
     render_seq: Option<RenderSequence>,
     render_dirty: bool,
     profiler: Profiler,
-    build_data: D,
-    cb_executor: CallbackExecutor,
-    widget_builder: Box<dyn Fn(D)>,
-    msg_channel: MessageChannel,
+    gui_builder: D,
+    cb_executor: GenericCallbackExecutor<D>,
 }
 
 impl<D> Actor for GuiContext<D>
 where
-    D: PartialEq + Clone + 'static,
+    D: GuiBuilder + 'static,
 {
     fn receive(&mut self, msg: Box<dyn Message>, world: &mut StaticWorld) {
         // println!("context got: {:?}",_msg);
-        match_downcast!( msg {
-            ui_event : UiEvent => {
-                match ui_event {
-                    UiEvent::GlutinEvent(ev) => {
-                        self.translate_event(ev);
-                    },
-                    UiEvent::Redraw => {
-                        self.render();
-                    },
-                    UiEvent::EventsCleared => {
-                        self.actualize_data();
-                        for message in self.cb_executor.sender.drain_messages() {
-                            world.send_annotated(message);
-                        }
-                    },
+        if let Ok(ui_event) = msg.downcast::<UiEvent>() {
+            let ui_event = *ui_event;
+            match ui_event {
+                UiEvent::GlutinEvent(ev) => {
+                    self.translate_event(ev);
                 }
-            },
-            _ => {}
-        });
+                UiEvent::Redraw => {
+                    self.render();
+                }
+                UiEvent::EventsCleared => {
+                    self.actualize_data();
+
+                    for message in self.cb_executor.sender.drain_messages() {
+                        world.send_annotated(message);
+                    }
+                }
+            }
+        }
     }
 }
 
 impl<D> GuiContext<D>
 where
-    D: Clone + 'static + PartialEq,
+    D: GuiBuilder + 'static,
 {
-    pub fn new<F>(
-        target: RenderTarget,
-        profile: bool,
-        widget_builder: F,
-        build_data: D,
-        msg_channel: MessageChannel,
-    ) -> GuiContext<D>
-    where
-        F: Fn(D) + 'static,
-    {
+    pub fn new(target: RenderTarget, profile: bool, gui_builder: D) -> GuiContext<D> {
         GuiContext {
             render_target: target,
             widgets: vec![],
@@ -91,10 +86,11 @@ where
             render_dirty: true,
             draw_res: DrawResources::new(),
             profiler: Profiler::new(profile),
-            build_data: build_data.clone(),
-            cb_executor: CallbackExecutor { data: Box::new(build_data), sender: PostBox::new() },
-            widget_builder: Box::new(widget_builder),
-            msg_channel,
+            cb_executor: GenericCallbackExecutor {
+                gui_builder: gui_builder.clone(),
+                sender: PostBox::new(),
+            },
+            gui_builder,
         }
     }
     pub fn init_gl_res(&mut self) {
@@ -109,7 +105,7 @@ where
             self.widgets[i].on_draw_build(&mut builder);
             // builder.add_clr_rect(Rect::from_pos_size(Vec2::origin(), self.widgets[i].size().to_pixels(1.0)), Vec4::new(1.0,0.0,0.0,0.5));
         }
-        self.render_seq = Some(builder.to_render_sequence(&self.render_target));
+        self.render_seq = Some(builder.into_render_sequence(&self.render_target));
         self.render_dirty = false;
         self.profiler.end();
     }
@@ -117,10 +113,7 @@ where
     pub fn rebuild_gui(&mut self) {
         crate::tools::gltraits::check_glerr_debug();
         self.profiler.begin("Rebuild_Gui");
-        let widget_builder = &self.widget_builder;
-        let widget_list = WidgetParser::produce_list(|| {
-            widget_builder(self.build_data.clone());
-        });
+        let widget_list = WidgetParser::produce_list(&self.gui_builder);
         // println!("cache_details is {:?}",widget_list.cache_details);
         // println!("cache_loc is {:?}",widget_list.cache_loc);
 
@@ -155,7 +148,9 @@ where
                 self.rebuild_cursor_inside(self.cursor_pos);
             }
             (Some(id), GrabState::GrabbedInside) => {
-                if self.widgets[id].on_release(&mut self.cb_executor) == EventResponse::HandledRedraw {
+                if self.widgets[id].on_release((&mut self.cb_executor).into())
+                    == EventResponse::HandledRedraw
+                {
                     self.render_dirty = true;
                 }
             }
@@ -169,10 +164,10 @@ where
         }
         match self.cursor_hierarchy {
             Some(mut id) => {
-                let mut result = self.widgets[id].on_press(&mut self.cb_executor);
+                let mut result = self.widgets[id].on_press((&mut self.cb_executor).into());
                 while result == EventResponse::Pass {
                     if let Some(parent) = self.parents[id] {
-                        result = self.widgets[parent].on_press(&mut self.cb_executor);
+                        result = self.widgets[parent].on_press((&mut self.cb_executor).into());
                         id = parent;
                     } else {
                         break;
@@ -202,15 +197,18 @@ where
         let siz = self.widgets[id].size().to_pixels(scl);
         Rect::from_pos_size(pos, siz).contains(p)
     }
-    fn fire_enter_leave_event(&mut self, id: usize, enter: bool) {
-        if enter {
-            if self.widgets[id].on_cursor_enter(&mut self.cb_executor) == EventResponse::HandledRedraw {
-                self.render_dirty = true;
-            }
-        } else {
-            if self.widgets[id].on_cursor_leave(&mut self.cb_executor) == EventResponse::HandledRedraw {
-                self.render_dirty = true;
-            }
+    fn fire_enter_event(&mut self, id: usize) {
+        if self.widgets[id].on_cursor_enter((&mut self.cb_executor).into())
+            == EventResponse::HandledRedraw
+        {
+            self.render_dirty = true;
+        }
+    }
+    fn fire_leave_event(&mut self, id: usize) {
+        if self.widgets[id].on_cursor_leave((&mut self.cb_executor).into())
+            == EventResponse::HandledRedraw
+        {
+            self.render_dirty = true;
         }
     }
     pub fn cursor_moved(&mut self, p: Vec2) {
@@ -223,7 +221,7 @@ where
             GrabState::GrabbedInside => {
                 if let Some(i) = self.cursor_hierarchy {
                     if !self.point_in_widget(i, p) {
-                        self.fire_enter_leave_event(i, false);
+                        self.fire_leave_event(i);
                         grab = GrabState::GrabbedOutside;
                     }
                 }
@@ -231,7 +229,7 @@ where
             GrabState::GrabbedOutside => {
                 if let Some(i) = self.cursor_hierarchy {
                     if self.point_in_widget(i, p) {
-                        self.fire_enter_leave_event(i, true);
+                        self.fire_enter_event(i);
                         grab = GrabState::GrabbedInside;
                     }
                 }
@@ -248,7 +246,7 @@ where
         for &id in self.widget_graph[i].iter().rev() {
             if self.point_in_widget(id, p) {
                 self.cursor_hierarchy = Some(id);
-                self.fire_enter_leave_event(id, true);
+                self.fire_enter_event(id);
                 self.complete_cursor_inside(id, p);
                 break;
             }
@@ -261,7 +259,7 @@ where
             if let Some(id) = self.cursor_hierarchy {
                 if !self.point_in_widget(id, p) {
                     reduced = false;
-                    self.fire_enter_leave_event(id, false);
+                    self.fire_leave_event(id);
                     self.pop_cursor_hierarchy();
                 }
             }
@@ -270,7 +268,7 @@ where
             for i in (0..self.widget_count()).rev() {
                 if self.parents[i].is_none() && self.point_in_widget(i, p) {
                     self.cursor_hierarchy = Some(i);
-                    self.fire_enter_leave_event(i, true);
+                    self.fire_enter_event(i);
                     break;
                 }
             }
@@ -322,10 +320,10 @@ where
         }
     }
     fn actualize_data(&mut self) {
-        let build_data = self.cb_executor.data.downcast_mut::<D>().unwrap();
-        
-        if self.build_data != *build_data {
-            self.build_data = build_data.clone();
+        let builder = &self.cb_executor.gui_builder;
+
+        if self.gui_builder != *builder {
+            self.gui_builder = builder.clone();
             self.rebuild_gui();
             self.rebuild_cursor_inside(self.cursor_pos);
         }
@@ -335,15 +333,15 @@ where
     }
 }
 
-use std::fs::OpenOptions;
-use gui::{WidgetParser, CallbackExecutor, PostBox};
-
-impl<D> Drop for GuiContext<D> {
+impl<D> Drop for GuiContext<D>
+where
+    D: GuiBuilder,
+{
     fn drop(&mut self) {
         if self.profiler.enabled() {
             let path = Path::new("performance.txt");
             let display = path.display();
-            
+
             let mut file = match OpenOptions::new().append(true).create(true).open(&path) {
                 Err(why) => panic!("couldn't create {}: {}", display, why),
                 Ok(file) => file,

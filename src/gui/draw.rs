@@ -1,10 +1,9 @@
 use super::font::*;
 use super::gl::types::*;
+use mecs::RenderTarget;
 use std::collections::HashMap;
 use tools::*;
-use mecs::RenderTarget;
 
-use super::font;
 use gui::Align;
 
 pub struct DrawResources {
@@ -27,17 +26,23 @@ impl DrawResources {
     pub fn has_texture(&self, name: &str) -> bool {
         self.textures.contains_key(name)
     }
-    pub fn texture_id(&mut self, name: &str) -> u32 {
+    pub fn texture_size(&mut self, name: &str) -> Option<Vec2> {
+        self.texture(name).map(|tex| tex.size())
+    }
+    pub fn texture_id(&mut self, name: &str) -> Option<u32> {
+        self.texture(name).map(|tex| tex.id())
+    }
+    pub fn texture(&mut self, name: &str) -> Option<&mut RgbaTexture> {
         if !self.textures.contains_key(name) {
-            if let Ok(tex) = RgbaTexture::from_file(name) {
-                let id = tex.id();
-
-                self.textures.insert(name.to_owned(), tex);
-                return id;
+            for extension in ["", ".png", ".jpg", ".bmp", ".tif", ".gif"].iter() {
+                if let Ok(tex) = RgbaTexture::from_file(&(name.to_owned() + extension)) {
+                    self.textures.insert(name.to_owned(), tex);
+                    break;
+                }
             }
-            return 0;
         }
-        self.textures[name].id()
+
+        self.textures.get_mut(name)
     }
     pub fn create_defaults(&mut self) -> Result<(), ShaderCompileErr> {
         let col_shader = DrawShader::compile(
@@ -135,6 +140,9 @@ fn offset(v: Vec<Vec3>, o: Vec3) -> Vec<Vec3> {
 }
 
 impl<'a> DrawBuilder<'a> {
+    pub fn resources(&mut self) -> &mut DrawResources {
+        self.draw_resources
+    }
     pub fn new(draw_resources: &mut DrawResources) -> DrawBuilder {
         DrawBuilder {
             objects: Vec::new(),
@@ -155,52 +163,51 @@ impl<'a> DrawBuilder<'a> {
                 ((a - b).perp() + (b - c).perp()).sgn()
             })
             .collect();
-        
+
         let id_to_p = |&i| {
             Vec3::from_vec2(
                 if i < n {
                     let normal: Vec2 = norm[i];
-                    
+
                     pts[i] - normal * (normal.unsign().minxy() * 1.1 + 0.8)
                 } else {
-                    pts[i-n]
+                    pts[i - n]
                 },
                 0.0,
             )
         };
-        
+
         let id_to_c = |&i| {
             let mut c = clr;
             if i >= n {
-                let normal: Vec2 = norm[i-n];
-                
+                let normal: Vec2 = norm[i - n];
+
                 let x = normal.unsign().minxy();
-                
+
                 c.w = if x >= 0.03 {
-                    1.0 - f32::powf(x - 0.03,0.3)
+                    1.0 - f32::powf(x - 0.03, 0.3)
                 } else {
                     let x = x * 10.0;
-                    
-                    1.0 - f32::powf(3.0*x*x - 2.0*x*x*x,1.5)
+
+                    1.0 - f32::powf(3.0 * x * x - 2.0 * x * x * x, 1.5)
                 };
             }
             c
         };
-        
+
         let ids_fill = (1..n - 1).map(|i| vec![0, i, i + 1]).flatten();
         let ids_outline = (0..n)
             .map(|i| vec![i, (i + 1) % n, (i + 1) % n + n, i, (i + 1) % n + n, i + n])
             .flatten();
-        
+
         let ids = if antialias {
             ids_outline.chain(ids_fill).collect::<Vec<usize>>()
         } else {
             ids_fill.collect::<Vec<usize>>()
         };
-        
+
         let ids = ids.iter();
-        
-        
+
         self.objects.push(DrawObject {
             pts: offset(ids.clone().map(id_to_p).collect(), self.offset),
             clr: DrawColor::Array(ids.map(id_to_c).collect()),
@@ -211,8 +218,10 @@ impl<'a> DrawBuilder<'a> {
         })
     }
     pub fn add_clr_rect(&mut self, rct: Rect, clr: Vec4) {
-        if clr.w == 0.0 {return;}
-        
+        if clr.w == 0.0 {
+            return;
+        }
+
         self.objects.push(DrawObject {
             pts: offset(rct.triangulate_3d(), self.offset),
             clr: DrawColor::Const(clr),
@@ -222,21 +231,31 @@ impl<'a> DrawBuilder<'a> {
             depth: self.offset.z,
         })
     }
-    pub fn add_tex_rect(&mut self, rct: Rect, tex_name: &str, clr: Vec4) {
-        if tex_name.is_empty() || clr.w == 0.0 {return;}
-        
+    pub fn add_tex_rect(&mut self, place_rct: Rect, cutout_rect: Rect, tex_name: &str, clr: Vec4) {
+        if tex_name.is_empty() || clr.w == 0.0 {
+            return;
+        }
+
         // println!("Adding tex \"{}\" at {:?} with offset {:?}", tex_name, rct.pos(), self.offset);
-        
+
         self.objects.push(DrawObject {
-            pts: offset(rct.triangulate_3d(), self.offset),
+            pts: offset(place_rct.triangulate_3d(), self.offset),
             clr: DrawColor::Const(clr),
-            tpt: Some(Rect::unit().triangulate()),
-            tex: Some(self.draw_resources.texture_id(tex_name)),
+            tpt: Some(cutout_rect.triangulate()),
+            tex: self.draw_resources.texture_id(tex_name),
             transparent: true,
             depth: self.offset.z,
         })
     }
-    pub fn add_text(&mut self, text: &str, font: &str, size: Vec2, clr: Vec4, align: Align, font_size: f32) {
+    pub fn add_text(
+        &mut self,
+        text: &str,
+        font: &str,
+        size: Vec2,
+        clr: Vec4,
+        align: Align,
+        font_size: f32,
+    ) {
         let font = self.draw_resources.fonts.font_family(&font).unwrap();
         let (bb_rects, uv_rects) = font.layout_paragraph(
             &text,
@@ -279,7 +298,7 @@ impl<'a> DrawBuilder<'a> {
             .map(|o| match &o.clr {
                 DrawColor::Array(v) => v.clone(),
                 DrawColor::Const(c) => vec![*c; o.pts.len()],
-                DrawColor::Default  => vec![Vec4::WHITE; o.pts.len()],
+                DrawColor::Default => vec![Vec4::WHITE; o.pts.len()],
             })
             .flatten()
             .collect();
@@ -331,7 +350,7 @@ impl<'a> DrawBuilder<'a> {
         });
     }
 
-    pub fn to_render_sequence(mut self, render_target: &RenderTarget) -> RenderSequence {
+    pub fn into_render_sequence(mut self, render_target: &RenderTarget) -> RenderSequence {
         let cmp_dobj = |o1: &DrawObject, o2: &DrawObject| {
             if o1.depth != o2.depth && (o1.transparent || o2.transparent) {
                 o1.depth.partial_cmp(&o2.depth).unwrap()
@@ -340,7 +359,6 @@ impl<'a> DrawBuilder<'a> {
                     .cmp(&o2.transparent)
                     .then(o1.tex.cmp(&o2.tex))
             }
-            
         };
         self.objects.sort_by(cmp_dobj);
         let n = self.objects.len();

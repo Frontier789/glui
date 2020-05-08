@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 extern crate gl;
+extern crate glui;
 extern crate glui_proc;
 extern crate glutin;
 extern crate image;
@@ -12,11 +13,12 @@ use std::time::Instant;
 
 use gl::types::*;
 
-use gui::*;
 use gui::elements::*;
+use gui::widget_parser::StoredCallback;
+use gui::*;
 use mecs::*;
-use tools::*;
 use tools::camera::Camera;
+use tools::*;
 
 #[macro_use]
 mod gui;
@@ -24,7 +26,7 @@ mod mecs;
 mod tools;
 
 extern "C" {
-	fn puts(s: *const c_char);
+    fn puts(s: *const c_char);
 }
 
 // TODOs
@@ -43,74 +45,70 @@ extern "C" {
 
 #[derive(Clone, Debug, PartialEq)]
 struct Data {
-	goat: i32,
-	shown: String,
-	show_red: bool,
+    goat: i32,
+    shown: String,
+    show_red: bool,
 }
 
-fn experimental(param: Data) {
-	-Button {
-		text: "HY".to_owned(),
-		..Default::default()
-	};
-	
-	// -FixedPanel {
-	// 	size: 50.0,
-	// 	..Default::default()
-	// } >> {
-		// -Padding {
-		// 	left: PaddingValue::Units(20.0),
-		// 	..Default::default()
-		// } >>
-		// 	-Text {
-		// 		text: param.shown.clone(),
-		// 		font: "arial".to_owned(),
-		// 		align: Align::from(HAlign::Left, VAlign::Center),
-		// 		color: if param.show_red { Vec4::RED } else { Vec4::BLUE },
-		// 		..Default::default()
-		// 	};
+#[allow(unused_must_use)]
+impl GuiBuilder for Data {
+    fn build(&self) {
+        -FixedPanel {
+            size: 50.0,
+            ..Default::default()
+        } << {
+            -Padding {
+                left: PaddingValue::Units(20.0),
+                ..Default::default()
+            } << -Text {
+                text: self.shown.clone(),
+                font: "arial".to_owned(),
+                align: Align::from(HAlign::Left, VAlign::Center),
+                color: if self.show_red { Vec4::RED } else { Vec4::BLUE },
+                ..Default::default()
+            };
 
-		// -GridLayout {
-		// 	col_widths: vec![1.0; 5],
-		// 	row_heights: vec![1.0; 5],
-		// 		..Default::default()
-		// } >> {
-		// 	for i in 0..20 {
-		// 		let text = format!("{}", i + param.goat);
-		// 		// mybutton(text, i == 13);
-		// 	}
-		// 	-Toggle {
-		// 		on: param.show_red,
-		// 		on_text: "ON".to_owned(),
-		// 		off_text: "OFF".to_owned(),
-		// 		// callback: |data, button| {
-		// 		//     data.show_red = button.on;
-		// 		// },
-		// 		..Default::default()
-		// 	};
-		// };
-	// };
-	println!("END");
+            -GridLayout {
+                col_widths: vec![1.0; 5],
+                row_heights: vec![1.0; 5],
+                ..Default::default()
+            } << {
+                for i in 0..20 {
+                    let text = format!("{}", i + self.goat);
+                    self.mybutton(text, i == 13);
+                }
+                -Toggle {
+                    on: self.show_red,
+                    on_text: "ON".to_owned(),
+                    off_text: "OFF".to_owned(),
+                    callback: self.make_callback2(|data, button: &Toggle| {
+                        data.show_red = button.on;
+                    }),
+                    ..Default::default()
+                };
+            };
+        };
+    }
 }
-//
-// #[glui::builder(Data)]
-// pub fn mybutton(text: String, exitter: bool) {
-//     Padding {
-//         children: {
-//             Button {
-//                 text: text.clone(),
-//                 callback: |data, _button, sender| {
-//                     data.shown += &text;
-//                     if exitter {
-//                         sender.send(MessageTarget::Root, message::Exit{});
-//                     }
-//                 },
-//                 background: ButtonBckg::RoundRect(Vec4::grey(0.1), 6.0),
-//             };
-//         },
-//         ..Padding::absolute(10.0)
-//     };
-// }
+
+#[allow(unused_must_use)]
+impl Data {
+    // #[glui::builder(Data)]
+    pub fn mybutton(&self, text: String, exitter: bool) {
+        -Padding::absolute(10.0)
+            << -Button {
+                text: text.clone(),
+                callback: self.make_callback3(move |data, _button, sender| {
+                    data.shown += &text;
+                    if exitter {
+                        sender.send(MessageTarget::Root, message::Exit {});
+                    }
+                }),
+                background: ButtonBckg::RoundRect(Vec4::grey(0.1), 6.0),
+                ..Default::default()
+            };
+    }
+}
 
 //
 // Model:
@@ -122,24 +120,22 @@ fn experimental(param: Data) {
 //
 
 fn main() {
-	let mut w: World = World::new_win(Vec2::new(640.0, 480.0), "", Vec3::grey(0.04));
-	
-	let mut gui = GuiContext::new(
-		w.render_target().unwrap(),
-		true,
-		experimental,
-		Data {
-			goat: 0,
-			shown: "".to_owned(),
-			show_red: true,
-		},
-		w.channel(),
-	);
-	gui.init_gl_res();
-	gui.rebuild_gui();
-	let id = w.add_actor(gui);
-	w.make_actor_ui_aware(id);
-	w.run();
+    let mut w: World = World::new_win(Vec2::new(640.0, 480.0), "", Vec3::grey(0.04));
+
+    let mut gui = GuiContext::new(
+        w.render_target().unwrap(),
+        true,
+        Data {
+            goat: 0,
+            shown: "hy ".to_owned(),
+            show_red: true,
+        },
+    );
+    gui.init_gl_res();
+    gui.rebuild_gui();
+    let id = w.add_actor(gui);
+    w.make_actor_ui_aware(id);
+    w.run();
 }
 
 // #![allow(dead_code)]

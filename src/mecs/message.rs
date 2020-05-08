@@ -49,3 +49,5 @@ impl From<ActorId> for MessageTarget {
 #[derive(Debug)]
 pub struct Exit {}
 impl Message for Exit {}
+
+pub const EXIT: Exit = Exit{};

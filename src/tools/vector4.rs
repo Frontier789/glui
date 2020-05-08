@@ -29,12 +29,21 @@ impl Vec4 {
         }
     }
 
+    pub fn with_w(self, w: f32) -> Vec4 {
+        Vec4 {
+            x: self.x,
+            y: self.y,
+            z: self.z,
+            w,
+        }
+    }
+
     pub fn from_vec3(xyz: Vec3, w: f32) -> Vec4 {
         Vec4 {
             x: xyz.x,
             y: xyz.y,
             z: xyz.z,
-            w: w,
+            w,
         }
     }
 
@@ -47,12 +56,7 @@ impl Vec4 {
         }
     }
     pub fn new(x: f32, y: f32, z: f32, w: f32) -> Vec4 {
-        Vec4 {
-            x: x,
-            y: y,
-            z: z,
-            w: w,
-        }
+        Vec4 { x, y, z, w }
     }
     pub fn rgb(&self) -> Vec3 {
         Vec3 {
