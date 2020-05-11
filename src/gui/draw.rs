@@ -1,116 +1,9 @@
-use super::font::*;
-use super::gl::types::*;
 use mecs::RenderTarget;
-use std::collections::HashMap;
+
 use tools::*;
 
+use graphics::{DrawResources, RenderCommand, RenderSequence};
 use gui::Align;
-
-pub struct DrawResources {
-    shaders: HashMap<String, DrawShader>,
-    textures: HashMap<String, RgbaTexture>,
-    fonts: FontLoader,
-}
-
-impl DrawResources {
-    pub fn new() -> DrawResources {
-        DrawResources {
-            shaders: HashMap::new(),
-            textures: HashMap::new(),
-            fonts: FontLoader::new(),
-        }
-    }
-    pub fn has_shader(&self, name: &str) -> bool {
-        self.shaders.contains_key(name)
-    }
-    pub fn has_texture(&self, name: &str) -> bool {
-        self.textures.contains_key(name)
-    }
-    pub fn texture_size(&mut self, name: &str) -> Option<Vec2> {
-        self.texture(name).map(|tex| tex.size())
-    }
-    pub fn texture_id(&mut self, name: &str) -> Option<u32> {
-        self.texture(name).map(|tex| tex.id())
-    }
-    pub fn texture(&mut self, name: &str) -> Option<&mut RgbaTexture> {
-        if !self.textures.contains_key(name) {
-            for extension in ["", ".png", ".jpg", ".bmp", ".tif", ".gif"].iter() {
-                if let Ok(tex) = RgbaTexture::from_file(&(name.to_owned() + extension)) {
-                    self.textures.insert(name.to_owned(), tex);
-                    break;
-                }
-            }
-        }
-
-        self.textures.get_mut(name)
-    }
-    pub fn create_defaults(&mut self) -> Result<(), ShaderCompileErr> {
-        let col_shader = DrawShader::compile(
-            "#version 420 core
-    
-    layout(location = 0) in vec3 pos;
-    layout(location = 1) in vec4 clr;
-    
-    uniform mat4 proj;
-    
-    out vec4 va_clr;
-    
-    void main()
-    {
-        gl_Position = proj * vec4(pos, 1);
-        
-        va_clr = clr;
-    }",
-            "#version 420 core
-    
-    in vec4 va_clr;
-    
-    out vec4 color;
-    
-    void main()
-    {
-        color = va_clr;
-    }",
-        )?;
-        let tex_shader = DrawShader::compile(
-            "#version 420 core
-    
-    layout(location = 0) in vec3 pos;
-    layout(location = 1) in vec4 clr;
-    layout(location = 2) in vec2 tpt;
-    
-    uniform mat4 proj;
-    
-    out vec4 va_clr;
-    out vec2 va_tpt;
-    
-    void main()
-    {
-        gl_Position = proj * vec4(pos, 1);
-        
-        va_clr = clr;
-        va_tpt = tpt;
-    }",
-            "#version 420 core
-    
-    in vec4 va_clr;
-    in vec2 va_tpt;
-    
-    uniform sampler2D tex;
-    
-    out vec4 color;
-    
-    void main()
-    {
-        color = va_clr * texture(tex, va_tpt);
-    }",
-        )?;
-        self.shaders.insert("col_shader".to_owned(), col_shader);
-        self.shaders.insert("tex_shader".to_owned(), tex_shader);
-
-        Ok(())
-    }
-}
 
 #[derive(Debug)]
 pub enum DrawColor {
@@ -256,7 +149,7 @@ impl<'a> DrawBuilder<'a> {
         align: Align,
         font_size: f32,
     ) {
-        let font = self.draw_resources.fonts.font_family(&font).unwrap();
+        let font = self.draw_resources.font_family(&font).unwrap();
         let (bb_rects, uv_rects) = font.layout_paragraph(
             &text,
             f32::round(font_size),
@@ -309,8 +202,8 @@ impl<'a> DrawBuilder<'a> {
         let mut vao = VertexArray::new();
         vao.attrib_buffer(0, &pbuf);
         vao.attrib_buffer(1, &cbuf);
-        render_seq.buffers.push(pbuf.as_base_type());
-        render_seq.buffers.push(cbuf.as_base_type());
+        render_seq.add_buffer(pbuf.as_base_type());
+        render_seq.add_buffer(cbuf.as_base_type());
 
         let mut uniforms = vec![Uniform::Matrix4(
             "proj".to_owned(),
@@ -333,13 +226,13 @@ impl<'a> DrawBuilder<'a> {
             let tbuf = Buffer::from_vec(tpt);
             vao.attrib_buffer(2, &tbuf);
             shader_name = "tex_shader".to_owned();
-            render_seq.buffers.push(tbuf.as_base_type());
+            render_seq.add_buffer(tbuf.as_base_type());
 
             uniforms.push(Uniform::Texture2D("tex".to_owned(), tex.clone()));
         } else {
             shader_name = "col_shader".to_owned();
         }
-        render_seq.commands.push(RenderCommand {
+        render_seq.add_command(RenderCommand {
             vao,
             mode: DrawMode::Triangles,
             first: 0,
@@ -375,77 +268,5 @@ impl<'a> DrawBuilder<'a> {
             i = j;
         }
         r
-    }
-}
-
-#[derive(Debug)]
-pub enum Uniform {
-    Vector2(String, Vec2),
-    Vector4(String, Vec4),
-    Matrix4(String, Mat4),
-    Texture2D(String, u32),
-}
-
-#[derive(Debug)]
-pub struct RenderSequence {
-    buffers: Vec<Buffer<f32>>,
-    commands: Vec<RenderCommand>,
-}
-
-impl RenderSequence {
-    pub fn new() -> RenderSequence {
-        RenderSequence {
-            buffers: vec![],
-            commands: vec![],
-        }
-    }
-    pub fn execute(&self, resources: &mut DrawResources) {
-        for cmd in &self.commands {
-            cmd.vao.bind();
-            let shader = resources.shaders.get_mut(&cmd.shader).unwrap();
-            shader.bind();
-            for uniform in &cmd.uniforms {
-                match uniform {
-                    Uniform::Vector2(id, value) => {
-                        shader.set_uniform(id, *value);
-                    }
-                    Uniform::Vector4(id, value) => {
-                        shader.set_uniform(id, *value);
-                    }
-                    Uniform::Matrix4(id, value) => {
-                        shader.set_uniform(id, *value);
-                    }
-                    Uniform::Texture2D(id, value) => {
-                        shader.uniform_tex2d_id(id, *value);
-                    }
-                }
-            }
-            cmd.execute();
-        }
-    }
-}
-
-#[derive(Debug)]
-struct RenderCommand {
-    pub vao: VertexArray,
-    pub mode: DrawMode,
-    pub first: usize,
-    pub count: usize,
-    pub shader: String,
-    pub uniforms: Vec<Uniform>,
-    pub transparent: bool,
-}
-
-impl RenderCommand {
-    fn execute(&self) {
-        unsafe {
-            if self.transparent {
-                gl::Enable(gl::BLEND);
-                gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
-            } else {
-                gl::Disable(gl::BLEND);
-            }
-            gl::DrawArrays(self.mode.into(), self.first as GLint, self.count as GLsizei);
-        }
     }
 }

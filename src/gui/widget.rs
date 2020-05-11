@@ -8,7 +8,7 @@ use super::DrawBuilder;
 use self::downcast_rs::impl_downcast;
 use self::downcast_rs::Downcast;
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum GuiDimension {
     Default,
     Relative(f32),

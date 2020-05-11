@@ -54,7 +54,7 @@ struct Data {
 impl GuiBuilder for Data {
     fn build(&self) {
         -FixedPanel {
-            size: 50.0,
+            size: GuiDimension::Units(50.0),
             ..Default::default()
         } << {
             -Padding {

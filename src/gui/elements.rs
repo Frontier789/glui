@@ -247,7 +247,7 @@ impl Widget for Padding {
     fn place_child(&mut self, child_size: Vec2px, child_descent: f32) -> WidgetPosition {
         let s = self.size();
         let sd = self.private.stacking_depth;
-        self.private.stacking_depth += child_descent;
+        self.private.stacking_depth += child_descent + 0.01;
 
         let padx = self.left.to_units(s.x);
         let pady = self.top.to_units(s.y);
@@ -282,6 +282,24 @@ impl Padding {
             right: PaddingValue::Units(amount),
             top: PaddingValue::Units(amount),
             bottom: PaddingValue::Units(amount),
+            ..Default::default()
+        }
+    }
+    pub fn units(left: f32, right: f32, top: f32, bottom: f32) -> Padding {
+        Padding {
+            left: PaddingValue::Units(left),
+            right: PaddingValue::Units(right),
+            top: PaddingValue::Units(top),
+            bottom: PaddingValue::Units(bottom),
+            ..Default::default()
+        }
+    }
+    pub fn ratios(left: f32, right: f32, top: f32, bottom: f32) -> Padding {
+        Padding {
+            left: PaddingValue::Relative(left),
+            right: PaddingValue::Relative(right),
+            top: PaddingValue::Relative(top),
+            bottom: PaddingValue::Relative(bottom),
             ..Default::default()
         }
     }

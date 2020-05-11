@@ -1,8 +1,9 @@
 use super::gl::types::*;
 use super::gltraits::GlUniform;
-use super::shadererr::*;
+use super::shader_error::*;
 use std::collections::HashMap;
 use std::fmt;
+use tools::Uniform;
 
 #[derive(Copy, Clone)]
 pub enum ShaderType {
@@ -104,10 +105,10 @@ fn program_info_log(sid: u32) -> String {
     text
 }
 
-fn compile_subshader(source: &str, t: ShaderType) -> Result<GLuint, ShaderCompileErr> {
+fn compile_subshader(source: &str, t: ShaderType) -> Result<GLuint, ShaderCompileError> {
     let sid = unsafe { gl::CreateShader(t.into()) };
     if sid == 0 {
-        return Err(ShaderCompileErr::new(
+        return Err(ShaderCompileError::new(
             "Failed to allocate shader.".to_string(),
         ));
     }
@@ -119,7 +120,7 @@ fn compile_subshader(source: &str, t: ShaderType) -> Result<GLuint, ShaderCompil
         if shader_status(sid) == 0 {
             let text = shader_info_log(sid);
 
-            Err(ShaderCompileErr::new(format!(
+            Err(ShaderCompileError::new(format!(
                 "Failed to compile {} err: {}",
                 t, text
             )))
@@ -129,7 +130,7 @@ fn compile_subshader(source: &str, t: ShaderType) -> Result<GLuint, ShaderCompil
     }
 }
 
-fn compile(sources: Vec<(&str, ShaderType)>) -> Result<(GLuint, Vec<GLuint>), ShaderCompileErr> {
+fn compile(sources: Vec<(&str, ShaderType)>) -> Result<(GLuint, Vec<GLuint>), ShaderCompileError> {
     let id: GLuint = unsafe { gl::CreateProgram() };
     let mut sids = Vec::with_capacity(sources.len());
 
@@ -151,7 +152,7 @@ fn compile(sources: Vec<(&str, ShaderType)>) -> Result<(GLuint, Vec<GLuint>), Sh
     if program_status(id) == 0 {
         let text = program_info_log(id);
 
-        return Err(ShaderCompileErr::new(format!(
+        return Err(ShaderCompileError::new(format!(
             "Failed to link shader err: {}",
             text
         )));
@@ -168,22 +169,22 @@ pub struct DrawShader {
 }
 
 impl DrawShader {
-    pub fn compile(vert_source: &str, frag_source: &str) -> Result<DrawShader, ShaderCompileErr> {
+    pub fn compile(vert_source: &str, frag_source: &str) -> Result<DrawShader, ShaderCompileError> {
         let (id, sids) = compile(vec![
             (vert_source, ShaderType::Vertex),
             (frag_source, ShaderType::Fragment),
         ])?;
         Ok(DrawShader {
-            id: id,
-            sids: sids,
+            id,
+            sids,
             tex_uniforms: HashMap::new(),
         })
     }
-    
+
     pub fn id(&self) -> GLuint {
         self.id
     }
-    
+
     pub fn bind(&self) {
         unsafe {
             gl::UseProgram(self.id());
@@ -196,16 +197,33 @@ impl DrawShader {
     {
         let name_ptr = std::ffi::CString::new(name).unwrap().into_raw();
         let loc: GLint = unsafe { gl::GetUniformLocation(self.id(), name_ptr as *const i8) };
-        
+
         if loc > -1 {
             T::set_uniform_impl(val, self.id, loc, &mut self.tex_uniforms);
         }
     }
-    
+
+    pub fn set_uniform_val(&mut self, uniform: Uniform) {
+        match uniform {
+            Uniform::Vector2(id, value) => {
+                self.set_uniform(&id, value);
+            }
+            Uniform::Vector4(id, value) => {
+                self.set_uniform(&id, value);
+            }
+            Uniform::Matrix4(id, value) => {
+                self.set_uniform(&id, value);
+            }
+            Uniform::Texture2D(id, value) => {
+                self.uniform_tex2d_id(&id, value);
+            }
+        }
+    }
+
     pub fn uniform_tex2d_id(&mut self, name: &str, id: u32) {
         let name_ptr = std::ffi::CString::new(name).unwrap().into_raw();
         let loc: GLint = unsafe { gl::GetUniformLocation(self.id(), name_ptr as *const i8) };
-        
+
         if !self.tex_uniforms.contains_key(&loc) {
             let slot = self.tex_uniforms.len() as u32;
 
@@ -214,9 +232,9 @@ impl DrawShader {
             }
             self.tex_uniforms.insert(loc, slot);
         }
-        
+
         let slot = self.tex_uniforms[&loc];
-        
+
         unsafe {
             gl::ActiveTexture(gl::TEXTURE0 + slot);
             gl::BindTexture(gl::TEXTURE_2D, id);

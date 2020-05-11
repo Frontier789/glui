@@ -9,6 +9,8 @@ use tools::*;
 use super::draw::*;
 use super::widget::*;
 use super::widget_layout_builder::*;
+use graphics::DrawResources;
+use graphics::RenderSequence;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum GrabState {
@@ -124,6 +126,7 @@ where
         );
         layout_builder.build(self.render_target.logical_size());
         self.cursor_hierarchy = None;
+        self.active_widget = None;
         self.widget_graph = layout_builder.widget_graph;
         self.parents = widget_list.parents;
         self.widget_depth = widget_list.widget_depth;

@@ -1,7 +1,5 @@
 extern crate gl;
 
-pub use super::tools::*;
-
 pub use self::align::Align;
 pub use self::align::HAlign;
 pub use self::align::VAlign;
@@ -10,8 +8,6 @@ pub use self::callback::GenericCallbackExecutor;
 pub use self::callback::GuiCallback;
 pub use self::context::GuiContext;
 pub use self::draw::DrawBuilder;
-pub use self::draw::DrawResources;
-pub use self::draw::RenderSequence;
 pub use self::elements::Button;
 pub use self::elements::ButtonBckg;
 pub use self::elements::FixedPanel;
@@ -25,9 +21,6 @@ pub use self::elements::Square;
 pub use self::elements::Text;
 pub use self::elements::Toggle;
 pub use self::elements::VertLayout;
-pub use self::font::Font;
-pub use self::font::FontLoader;
-pub use self::font::FontLoaderError;
 pub use self::gui_builder::GuiBuilder;
 pub use self::gui_builder::WidgetAdder;
 pub use self::post_box::PostBox;
@@ -49,7 +42,6 @@ pub mod callback;
 pub mod context;
 pub mod draw;
 pub mod elements;
-pub mod font;
 pub mod post_box;
 pub mod widget;
 pub mod widget_layout_builder;
