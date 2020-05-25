@@ -1,4 +1,3 @@
-extern crate font_kit;
 extern crate rusttype;
 extern crate unicode_normalization;
 

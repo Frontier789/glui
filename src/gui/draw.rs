@@ -1,8 +1,6 @@
-use mecs::RenderTarget;
-
 use tools::*;
 
-use graphics::{DrawResources, RenderCommand, RenderSequence};
+use graphics::{DrawResources, DrawShaderSelector, RenderCommand, RenderSequence};
 use gui::Align;
 
 #[derive(Debug)]
@@ -33,6 +31,9 @@ fn offset(v: Vec<Vec3>, o: Vec3) -> Vec<Vec3> {
 }
 
 impl<'a> DrawBuilder<'a> {
+    pub fn gui_scale(&self) -> f32 {
+        self.draw_resources.window_info.gui_scale
+    }
     pub fn resources(&mut self) -> &mut DrawResources {
         self.draw_resources
     }
@@ -45,9 +46,11 @@ impl<'a> DrawBuilder<'a> {
     }
     pub fn add_clr_convex<FP>(&mut self, pos_fun: FP, clr: Vec4, n: usize, antialias: bool)
     where
-        FP: Fn(f32) -> Vec2,
+        FP: Fn(f32) -> Vec2px,
     {
-        let pts: Vec<Vec2> = (0..n).map(|i| pos_fun(i as f32 / n as f32)).collect();
+        let pts: Vec<Vec2> = (0..n)
+            .map(|i| pos_fun(i as f32 / n as f32).to_pixels(self.gui_scale()))
+            .collect();
         let norm: Vec<Vec2> = (0..n)
             .map(|i| {
                 let a = pts[(i + n - 1) % n];
@@ -116,7 +119,7 @@ impl<'a> DrawBuilder<'a> {
         }
 
         self.objects.push(DrawObject {
-            pts: offset(rct.triangulate_3d(), self.offset),
+            pts: offset((rct * self.gui_scale()).triangulate_3d(), self.offset),
             clr: DrawColor::Const(clr),
             tpt: None,
             tex: None,
@@ -132,7 +135,7 @@ impl<'a> DrawBuilder<'a> {
         // println!("Adding tex \"{}\" at {:?} with offset {:?}", tex_name, rct.pos(), self.offset);
 
         self.objects.push(DrawObject {
-            pts: offset(place_rct.triangulate_3d(), self.offset),
+            pts: offset((place_rct * self.gui_scale()).triangulate_3d(), self.offset),
             clr: DrawColor::Const(clr),
             tpt: Some(cutout_rect.triangulate()),
             tex: self.draw_resources.texture_id(tex_name),
@@ -144,18 +147,19 @@ impl<'a> DrawBuilder<'a> {
         &mut self,
         text: &str,
         font: &str,
-        size: Vec2,
+        size: Vec2px,
         clr: Vec4,
         align: Align,
         font_size: f32,
     ) {
+        let gui_scale = self.gui_scale();
         let font = self.draw_resources.font_family(&font).unwrap();
         let (bb_rects, uv_rects) = font.layout_paragraph(
             &text,
             f32::round(font_size),
             f32::round(font_size),
             align,
-            size,
+            size.to_pixels(gui_scale),
         );
         let o = self.offset;
         self.objects.push(DrawObject {
@@ -172,18 +176,12 @@ impl<'a> DrawBuilder<'a> {
         })
     }
 
-    fn append_render_seq(
-        &self,
-        beg: usize,
-        end: usize,
-        render_seq: &mut RenderSequence,
-        render_target: &RenderTarget,
-    ) {
+    fn append_render_seq(&self, beg: usize, end: usize, render_seq: &mut RenderSequence) {
         let pts: Vec<Vec3> = self.objects[beg..end]
             .iter()
             .map(|o| o.pts.clone())
             .flatten()
-            .map(|p| p * render_target.gui_scale)
+            .map(|p| p * self.draw_resources.window_info.gui_scale)
             .collect();
 
         let clr: Vec<Vec4> = self.objects[beg..end]
@@ -202,21 +200,21 @@ impl<'a> DrawBuilder<'a> {
         let mut vao = VertexArray::new();
         vao.attrib_buffer(0, &pbuf);
         vao.attrib_buffer(1, &cbuf);
-        render_seq.add_buffer(pbuf.as_base_type());
-        render_seq.add_buffer(cbuf.as_base_type());
+        render_seq.add_buffer(pbuf.into_base_type());
+        render_seq.add_buffer(cbuf.into_base_type());
 
         let mut uniforms = vec![Uniform::Matrix4(
-            "proj".to_owned(),
+            "projection".to_owned(),
             Mat4::ortho(
                 0.0,
-                render_target.size.y,
-                render_target.size.x,
+                self.draw_resources.window_info.size.y,
+                self.draw_resources.window_info.size.x,
                 0.0,
                 1.0,
                 -1.0,
             ),
         )];
-        let shader_name;
+        let shader;
         if let (Some(tex), Some(_)) = (&self.objects[beg].tex, &self.objects[beg].tpt) {
             let tpt: Vec<Vec2> = self.objects[beg..end]
                 .iter()
@@ -225,25 +223,25 @@ impl<'a> DrawBuilder<'a> {
                 .collect();
             let tbuf = Buffer::from_vec(tpt);
             vao.attrib_buffer(2, &tbuf);
-            shader_name = "tex_shader".to_owned();
-            render_seq.add_buffer(tbuf.as_base_type());
+            shader = DrawShaderSelector::DefaultTextured;
+            render_seq.add_buffer(tbuf.into_base_type());
 
-            uniforms.push(Uniform::Texture2D("tex".to_owned(), tex.clone()));
+            uniforms.push(Uniform::Texture2D("tex".to_owned(), *tex));
         } else {
-            shader_name = "col_shader".to_owned();
+            shader = DrawShaderSelector::DefaultColored;
         }
         render_seq.add_command(RenderCommand {
             vao,
             mode: DrawMode::Triangles,
-            first: 0,
-            count: pts_count,
-            shader: shader_name,
+            indices: (0..pts_count).into(),
+            shader,
             uniforms,
             transparent: self.objects[beg].transparent,
+            instances: 1,
         });
     }
 
-    pub fn into_render_sequence(mut self, render_target: &RenderTarget) -> RenderSequence {
+    pub fn into_render_sequence(mut self) -> RenderSequence {
         let cmp_dobj = |o1: &DrawObject, o2: &DrawObject| {
             if o1.depth != o2.depth && (o1.transparent || o2.transparent) {
                 o1.depth.partial_cmp(&o2.depth).unwrap()
@@ -264,7 +262,7 @@ impl<'a> DrawBuilder<'a> {
                 j += 1;
             }
 
-            self.append_render_seq(i, j, &mut r, render_target);
+            self.append_render_seq(i, j, &mut r);
             i = j;
         }
         r

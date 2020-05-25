@@ -4,12 +4,14 @@ extern crate image;
 pub use crate::match_downcast;
 
 pub use self::buffer::Buffer;
-pub use self::camera::Camera3D;
 pub use self::draw::DrawMode;
 pub use self::font::Font;
 pub use self::font_error::FontError;
 pub use self::font_loader::FontLoader;
 pub use self::font_loader_error::FontLoaderError;
+pub use self::framebuffer::Framebuffer;
+pub use self::framebuffer::FrameBufferAttachment;
+pub use self::framebuffer::FrameBufferStatus;
 pub use self::gltraits::GlNum;
 pub use self::gltraits::GlUniform;
 pub use self::gpuclock::GPUClock;
@@ -29,7 +31,7 @@ pub use self::vector3::Vec3;
 pub use self::vector4::Vec4;
 
 pub mod buffer;
-pub mod camera;
+pub mod framebuffer;
 pub mod draw;
 pub mod font;
 pub mod font_error;

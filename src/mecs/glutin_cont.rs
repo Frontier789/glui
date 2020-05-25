@@ -1,39 +1,47 @@
-use tools::*;
 use super::glutin_util::*;
 use super::render_target::*;
+use std::time::Duration;
+use tools::*;
 
 pub struct GlutinContextData {
-    event_loop: GlutinEventLoop,
-    gl_context: GlutinGLContext,
-    bgcolor: Vec3,
+    pub event_loop: GlutinEventLoop,
+    pub gl_context: GlutinGLContext,
+    pub bgcolor: Vec3,
+    pub update_interval: Duration,
 }
 
 impl GlutinContextData {
-    fn create_context(event_loop: &GlutinEventLoop, bgcolor: Vec3) -> Result<GlutinGLContext, glutin::CreationError> {
+    fn create_context(
+        event_loop: &GlutinEventLoop,
+        bgcolor: Vec3,
+    ) -> Result<GlutinGLContext, glutin::CreationError> {
         let cb = glutin::ContextBuilder::new()
             .with_gl_profile(glutin::GlProfile::Core)
             .with_gl(glutin::GlRequest::Latest);
-        
+
         let gl_context = build_context(cb, event_loop)?;
         let gl_context = unsafe { gl_context.make_current().unwrap() };
-        
-        prepare_gl(bgcolor, |symbol| gl_context.get_proc_address(symbol) as *const _);
-        
+
+        prepare_gl(bgcolor, |symbol| {
+            gl_context.get_proc_address(symbol) as *const _
+        });
+
         Ok(gl_context)
     }
-    
-    pub fn new(bgcolor: Vec3) -> Result<Self, glutin::CreationError> {
+
+    pub fn new(bgcolor: Vec3, update_interval: Duration) -> Result<Self, glutin::CreationError> {
         let event_loop = glutin::event_loop::EventLoop::with_user_event();
         let gl_context = Self::create_context(&event_loop, bgcolor)?;
-        
+
         Ok(GlutinContextData {
             event_loop,
             gl_context,
             bgcolor,
+            update_interval,
         })
     }
-    pub fn render_target(&self) -> RenderTarget {
-        RenderTarget {
+    pub fn render_target(&self) -> WindowInfo {
+        WindowInfo {
             size: Vec2::new(1.0, 1.0),
             gui_scale: 1.0,
             ..Default::default()
@@ -42,9 +50,6 @@ impl GlutinContextData {
     }
     pub fn event_loop_proxy(&self) -> GlutinEventLoopProxy {
         self.event_loop.create_proxy()
-    }
-    pub fn unpack(self) -> (GlutinEventLoop,GlutinGLContext,Vec3) {
-        (self.event_loop, self.gl_context, self.bgcolor)
     }
 }
 
@@ -85,14 +90,14 @@ fn build_context<T1: ContextCurrentState>(
         Ok(ctx) => return Ok(ctx),
         Err(err) => {
             println!("Context creation using surfaceless failed: {}", err);
-        },
+        }
     };
 
     match build_context_headless(cb.clone(), el) {
         Ok(ctx) => return Ok(ctx),
         Err(err) => {
             println!("Context creation using headless failed: {}", err);
-        },
+        }
     };
 
     build_context_osmesa(cb)?

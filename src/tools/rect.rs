@@ -1,5 +1,6 @@
 use super::Vec2;
 use super::Vec3;
+use std::ops::Mul;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Rect {
@@ -112,5 +113,18 @@ impl Rect {
 
     pub fn contains(&self, p: Vec2) -> bool {
         self.left <= p.x && self.right >= p.x && self.top <= p.y && self.bottom >= p.y
+    }
+}
+
+impl Mul<f32> for Rect {
+    type Output = Rect;
+
+    fn mul(self, rhs: f32) -> Self::Output {
+        Rect {
+            left: self.left * rhs,
+            top: self.top * rhs,
+            right: self.right * rhs,
+            bottom: self.bottom * rhs,
+        }
     }
 }

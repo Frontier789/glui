@@ -3,7 +3,10 @@ use tools::*;
 
 pub type GlutinKey = glutin::event::VirtualKeyCode;
 pub type GlutinButton = glutin::event::MouseButton;
-pub type GlutinEvent<'a> = glutin::event::WindowEvent<'a>;
+pub type GlutinWindowEvent<'a> = glutin::event::WindowEvent<'a>;
+pub type GlutinDeviceEvent = glutin::event::DeviceEvent;
+pub type GlutinScrollDelta = glutin::event::MouseScrollDelta;
+pub type GlutinElementState = glutin::event::ElementState;
 
 pub(super) type GlutinGLContext = glutin::Context<glutin::PossiblyCurrent>;
 pub(super) type GlutinControlFlow = glutin::event_loop::ControlFlow;
@@ -42,6 +45,24 @@ impl From<glutin::dpi::PhysicalPosition<f64>> for Vec2 {
 
 impl From<glutin::dpi::PhysicalPosition<i32>> for Vec2 {
     fn from(p: glutin::dpi::PhysicalPosition<i32>) -> Vec2 {
+        Vec2::new(p.x as f32, p.y as f32)
+    }
+}
+
+impl From<&glutin::dpi::PhysicalSize<u32>> for Vec2 {
+    fn from(s: &glutin::dpi::PhysicalSize<u32>) -> Vec2 {
+        Vec2::new(s.width as f32, s.height as f32)
+    }
+}
+
+impl From<&glutin::dpi::PhysicalPosition<f64>> for Vec2 {
+    fn from(p: &glutin::dpi::PhysicalPosition<f64>) -> Vec2 {
+        Vec2::new(p.x as f32, p.y as f32)
+    }
+}
+
+impl From<&glutin::dpi::PhysicalPosition<i32>> for Vec2 {
+    fn from(p: &glutin::dpi::PhysicalPosition<i32>) -> Vec2 {
         Vec2::new(p.x as f32, p.y as f32)
     }
 }

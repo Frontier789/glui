@@ -1,6 +1,6 @@
 use super::gl::types::*;
-use tools::*;
 use std::fmt;
+use tools::*;
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct GLVerion {
@@ -15,13 +15,13 @@ impl fmt::Display for GLVerion {
 }
 
 #[derive(Debug, Default, Copy, Clone, PartialEq)]
-pub struct RenderTarget {
+pub struct WindowInfo {
     pub size: Vec2,
     pub gui_scale: f32,
     pub gl_verison: GLVerion,
 }
 
-impl RenderTarget {
+impl WindowInfo {
     pub fn logical_size(&self) -> Vec2px {
         Vec2px::from_pixels(self.size, self.gui_scale)
     }

@@ -1,8 +1,10 @@
-use font_kit::error::*;
-use font_kit::family_name::*;
-use font_kit::handle::Handle;
-use font_kit::properties::*;
-use font_kit::source::*;
+extern crate font_kit;
+
+use self::font_kit::error::*;
+use self::font_kit::family_name::*;
+use self::font_kit::handle::Handle;
+use self::font_kit::properties::*;
+use self::font_kit::source::*;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -36,6 +38,7 @@ impl FontLoader {
         } else if name == "sans".to_owned()
             || name == "sans-serif".to_owned()
             || name == "sansserif".to_owned()
+            || name == "".to_owned()
         {
             FamilyName::SansSerif
         } else if name == "mono".to_owned() || name == "monospace".to_owned() {

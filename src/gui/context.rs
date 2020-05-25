@@ -1,6 +1,7 @@
 use std::fs::OpenOptions;
 use std::path::Path;
 
+use graphics::*;
 use gui::{GenericCallbackExecutor, GuiBuilder, PostBox, WidgetParser};
 use mecs::world::UiEvent;
 use mecs::*;
@@ -9,8 +10,6 @@ use tools::*;
 use super::draw::*;
 use super::widget::*;
 use super::widget_layout_builder::*;
-use graphics::DrawResources;
-use graphics::RenderSequence;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum GrabState {
@@ -23,7 +22,6 @@ pub struct GuiContext<D>
 where
     D: GuiBuilder + 'static,
 {
-    render_target: RenderTarget,
     draw_res: DrawResources,
     widgets: Vec<Box<dyn Widget + 'static>>,
     parents: Vec<Option<usize>>,
@@ -41,16 +39,16 @@ where
     cb_executor: GenericCallbackExecutor<D>,
 }
 
-impl<D> Actor for GuiContext<D>
+impl<D> System for GuiContext<D>
 where
     D: GuiBuilder + 'static,
 {
-    fn receive(&mut self, msg: Box<dyn Message>, world: &mut StaticWorld) {
+    fn receive(&mut self, msg: &Box<dyn Message>, world: &mut StaticWorld) {
         // println!("context got: {:?}",_msg);
-        if let Ok(ui_event) = msg.downcast::<UiEvent>() {
-            let ui_event = *ui_event;
+        let dc: Option<&UiEvent> = msg.downcast_ref::<UiEvent>();
+        if let Some(ui_event) = dc {
             match ui_event {
-                UiEvent::GlutinEvent(ev) => {
+                UiEvent::WindowEvent(ev) => {
                     self.translate_event(ev);
                 }
                 UiEvent::Redraw => {
@@ -63,6 +61,7 @@ where
                         world.send_annotated(message);
                     }
                 }
+                _ => {}
             }
         }
     }
@@ -72,9 +71,8 @@ impl<D> GuiContext<D>
 where
     D: GuiBuilder + 'static,
 {
-    pub fn new(target: RenderTarget, profile: bool, gui_builder: D) -> GuiContext<D> {
+    pub fn new(target: WindowInfo, profile: bool, gui_builder: D) -> GuiContext<D> {
         GuiContext {
-            render_target: target,
             widgets: vec![],
             parents: vec![],
             widget_graph: vec![],
@@ -86,7 +84,7 @@ where
             cursor_pos: Vec2::new(-1.0, -1.0),
             render_seq: None,
             render_dirty: true,
-            draw_res: DrawResources::new(),
+            draw_res: DrawResources::new(target).unwrap(),
             profiler: Profiler::new(profile),
             cb_executor: GenericCallbackExecutor {
                 gui_builder: gui_builder.clone(),
@@ -94,9 +92,6 @@ where
             },
             gui_builder,
         }
-    }
-    pub fn init_gl_res(&mut self) {
-        self.draw_res.create_defaults().unwrap();
     }
     fn rebuild_render_seq(&mut self) {
         self.profiler.begin("Rebuild_Render");
@@ -107,7 +102,7 @@ where
             self.widgets[i].on_draw_build(&mut builder);
             // builder.add_clr_rect(Rect::from_pos_size(Vec2::origin(), self.widgets[i].size().to_pixels(1.0)), Vec4::new(1.0,0.0,0.0,0.5));
         }
-        self.render_seq = Some(builder.into_render_sequence(&self.render_target));
+        self.render_seq = Some(builder.into_render_sequence());
         self.render_dirty = false;
         self.profiler.end();
     }
@@ -124,7 +119,7 @@ where
             widget_list.postorder,
             widget_list.widget_graph,
         );
-        layout_builder.build(self.render_target.logical_size());
+        layout_builder.build(self.draw_res.window_info.logical_size());
         self.cursor_hierarchy = None;
         self.active_widget = None;
         self.widget_graph = layout_builder.widget_graph;
@@ -136,7 +131,7 @@ where
         self.rebuild_render_seq();
     }
     pub fn resized(&mut self, s: Vec2) {
-        self.render_target.size = s;
+        self.draw_res.window_info.size = s;
         self.rebuild_gui();
     }
     pub fn widget_count(&self) -> usize {
@@ -195,7 +190,7 @@ where
         self.cursor_moved(Vec2::new(-1.0, -1.0));
     }
     fn point_in_widget(&self, id: usize, p: Vec2) -> bool {
-        let scl = self.render_target.gui_scale;
+        let scl = self.draw_res.window_info.gui_scale;
         let pos = self.positions[id].pos.to_pixels(scl);
         let siz = self.widgets[id].size().to_pixels(scl);
         Rect::from_pos_size(pos, siz).contains(p)
@@ -285,18 +280,18 @@ where
     }
     fn render(&mut self) {
         crate::tools::gltraits::check_glerr_debug();
-        let rseq = self.render_seq.as_ref().unwrap();
+        let rseq = self.render_seq.as_mut().unwrap();
 
         self.profiler.begin_gpu("Draw");
         rseq.execute(&mut self.draw_res);
         self.profiler.end_gpu();
     }
-    fn translate_event(&mut self, event: GlutinEvent) {
+    fn translate_event(&mut self, event: &GlutinWindowEvent<'static>) {
         match event {
-            GlutinEvent::Resized(size) => {
+            GlutinWindowEvent::Resized(size) => {
                 self.resized(size.into());
             }
-            GlutinEvent::KeyboardInput { input, .. } => match input.virtual_keycode {
+            GlutinWindowEvent::KeyboardInput { input, .. } => match input.virtual_keycode {
                 None => (),
                 Some(key) => {
                     if input.state == glutin::event::ElementState::Pressed {
@@ -306,17 +301,17 @@ where
                     }
                 }
             },
-            GlutinEvent::MouseInput { button, state, .. } => {
-                if state == glutin::event::ElementState::Pressed {
-                    self.button_pressed(button);
+            GlutinWindowEvent::MouseInput { button, state, .. } => {
+                if *state == glutin::event::ElementState::Pressed {
+                    self.button_pressed(*button);
                 } else {
-                    self.button_released(button);
+                    self.button_released(*button);
                 }
             }
-            GlutinEvent::CursorMoved { position, .. } => {
+            GlutinWindowEvent::CursorMoved { position, .. } => {
                 self.cursor_moved(position.into());
             }
-            GlutinEvent::CursorLeft { .. } => {
+            GlutinWindowEvent::CursorLeft { .. } => {
                 self.cursor_left();
             }
             _ => (),

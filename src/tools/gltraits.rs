@@ -8,6 +8,7 @@ use super::vector4::Vec4;
 use std::collections::HashMap;
 
 use super::gl::types::*;
+use std::cell::RefMut;
 
 /// Trait for types that can be stored in a buffer
 pub trait GlNum: Clone + Copy {
@@ -92,16 +93,11 @@ impl GlNum for Mat4 {
 
 /// Types that can be set as uniforms
 pub trait GlUniform {
-    fn set_uniform_impl(val: Self, prog: GLuint, loc: GLint, map: &mut HashMap<GLint, u32>);
+    fn set_uniform_impl(val: Self, prog: GLuint, loc: GLint, map: RefMut<HashMap<GLint, u32>>);
 }
 
 impl GlUniform for f32 {
-    fn set_uniform_impl(
-        val: Self,
-        prog: GLuint,
-        loc: GLint,
-        _map: &mut HashMap<GLint, u32>,
-    ) {
+    fn set_uniform_impl(val: Self, prog: GLuint, loc: GLint, _map: RefMut<HashMap<GLint, u32>>) {
         unsafe {
             gl::ProgramUniform1f(prog, loc, val);
         }
@@ -109,12 +105,7 @@ impl GlUniform for f32 {
 }
 
 impl GlUniform for i32 {
-    fn set_uniform_impl(
-        val: Self,
-        prog: GLuint,
-        loc: GLint,
-        _map: &mut HashMap<GLint, u32>,
-    ) {
+    fn set_uniform_impl(val: Self, prog: GLuint, loc: GLint, _map: RefMut<HashMap<GLint, u32>>) {
         unsafe {
             gl::ProgramUniform1i(prog, loc, val);
         }
@@ -122,12 +113,7 @@ impl GlUniform for i32 {
 }
 
 impl GlUniform for Vec2 {
-    fn set_uniform_impl(
-        val: Self,
-        prog: GLuint,
-        loc: GLint,
-        _map: &mut HashMap<GLint, u32>,
-    ) {
+    fn set_uniform_impl(val: Self, prog: GLuint, loc: GLint, _map: RefMut<HashMap<GLint, u32>>) {
         unsafe {
             gl::ProgramUniform2f(prog, loc, val.x, val.y);
         }
@@ -135,12 +121,7 @@ impl GlUniform for Vec2 {
 }
 
 impl GlUniform for Vec3 {
-    fn set_uniform_impl(
-        val: Self,
-        prog: GLuint,
-        loc: GLint,
-        _map: &mut HashMap<GLint, u32>,
-    ) {
+    fn set_uniform_impl(val: Self, prog: GLuint, loc: GLint, _map: RefMut<HashMap<GLint, u32>>) {
         unsafe {
             gl::ProgramUniform3f(prog, loc, val.x, val.y, val.z);
         }
@@ -148,12 +129,7 @@ impl GlUniform for Vec3 {
 }
 
 impl GlUniform for Vec4 {
-    fn set_uniform_impl(
-        val: Self,
-        prog: GLuint,
-        loc: GLint,
-        _map: &mut HashMap<GLint, u32>,
-    ) {
+    fn set_uniform_impl(val: Self, prog: GLuint, loc: GLint, _map: RefMut<HashMap<GLint, u32>>) {
         unsafe {
             gl::ProgramUniform4f(prog, loc, val.x, val.y, val.z, val.w);
         }
@@ -161,12 +137,7 @@ impl GlUniform for Vec4 {
 }
 
 impl GlUniform for Mat4 {
-    fn set_uniform_impl(
-        val: Self,
-        prog: GLuint,
-        loc: GLint,
-        _map: &mut HashMap<GLint, u32>,
-    ) {
+    fn set_uniform_impl(val: Self, prog: GLuint, loc: GLint, _map: RefMut<HashMap<GLint, u32>>) {
         unsafe {
             gl::ProgramUniformMatrix4fv(prog, loc, 1, gl::FALSE, val.as_ptr());
         }
@@ -177,7 +148,7 @@ impl<T> GlUniform for &T
 where
     T: Texture,
 {
-    fn set_uniform_impl(val: Self, prog: GLuint, loc: GLint, map: &mut HashMap<GLint, u32>) {
+    fn set_uniform_impl(val: Self, prog: GLuint, loc: GLint, mut map: RefMut<HashMap<GLint, u32>>) {
         if !map.contains_key(&loc) {
             let slot = map.len() as u32;
 
@@ -186,9 +157,9 @@ where
             }
             map.insert(loc, slot);
         }
-        
+
         let slot = map[&loc];
-        
+
         unsafe {
             gl::ActiveTexture(gl::TEXTURE0 + slot);
             val.bind();
@@ -199,10 +170,8 @@ where
 #[cfg(debug_assertions)]
 pub fn check_glerr_debug() {
     match unsafe { gl::GetError() } {
-        gl::NO_ERROR => {},
-        e => {
-            panic!("GL error detected: {}", gl_error_to_str(e))
-        }
+        gl::NO_ERROR => {}
+        e => panic!("GL error detected: {}", gl_error_to_str(e)),
     }
 }
 
@@ -225,7 +194,12 @@ pub fn gl_error_to_str(err: GLenum) -> &'static str {
 
 pub fn gl_get_string(val: gl::types::GLenum) -> String {
     unsafe {
-        String::from_utf8(std::ffi::CStr::from_ptr(gl::GetString(val) as *const i8).to_bytes().to_vec().clone())
-            .unwrap()
+        String::from_utf8(
+            std::ffi::CStr::from_ptr(gl::GetString(val) as *const i8)
+                .to_bytes()
+                .to_vec()
+                .clone(),
+        )
+        .unwrap()
     }
 }

@@ -1,9 +1,9 @@
 extern crate downcast_rs;
 use self::downcast_rs::impl_downcast;
 use self::downcast_rs::Downcast;
-use super::actor::*;
 use super::system::*;
 use std::fmt::Debug;
+use std::time::Duration;
 
 pub trait Message: Downcast + Debug + Send {}
 impl_downcast!(Message);
@@ -29,8 +29,8 @@ where
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub enum MessageTarget {
+    Broadcast,
     System(SystemId),
-    Actor(ActorId),
     Root,
 }
 
@@ -40,14 +40,12 @@ impl From<SystemId> for MessageTarget {
     }
 }
 
-impl From<ActorId> for MessageTarget {
-    fn from(id: ActorId) -> MessageTarget {
-        MessageTarget::Actor(id)
-    }
-}
-
 #[derive(Debug)]
 pub struct Exit {}
 impl Message for Exit {}
 
-pub const EXIT: Exit = Exit{};
+pub const EXIT: Exit = Exit {};
+
+#[derive(Debug)]
+pub struct Update(pub Duration);
+impl Message for Update {}

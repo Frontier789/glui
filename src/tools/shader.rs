@@ -1,11 +1,13 @@
 use super::gl::types::*;
 use super::gltraits::GlUniform;
 use super::shader_error::*;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
+use std::rc::Rc;
 use tools::Uniform;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum ShaderType {
     Compute,
     Vertex,
@@ -162,10 +164,15 @@ fn compile(sources: Vec<(&str, ShaderType)>) -> Result<(GLuint, Vec<GLuint>), Sh
 }
 
 #[derive(Debug)]
-pub struct DrawShader {
+struct ShaderData {
     id: u32,
     sids: Vec<u32>,
-    tex_uniforms: HashMap<GLint, u32>,
+    tex_uniforms: RefCell<HashMap<GLint, u32>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct DrawShader {
+    data: Rc<ShaderData>,
 }
 
 impl DrawShader {
@@ -175,14 +182,16 @@ impl DrawShader {
             (frag_source, ShaderType::Fragment),
         ])?;
         Ok(DrawShader {
-            id,
-            sids,
-            tex_uniforms: HashMap::new(),
+            data: Rc::new(ShaderData {
+                id,
+                sids,
+                tex_uniforms: RefCell::new(HashMap::new()),
+            }),
         })
     }
 
     pub fn id(&self) -> GLuint {
-        self.id
+        self.data.id
     }
 
     pub fn bind(&self) {
@@ -191,19 +200,20 @@ impl DrawShader {
         }
     }
 
-    pub fn set_uniform<T>(&mut self, name: &str, val: T)
+    pub fn set_uniform<T>(&self, name: &str, val: T)
     where
         T: GlUniform,
     {
         let name_ptr = std::ffi::CString::new(name).unwrap().into_raw();
+        // TODO: cache GetUniformLocation
         let loc: GLint = unsafe { gl::GetUniformLocation(self.id(), name_ptr as *const i8) };
 
         if loc > -1 {
-            T::set_uniform_impl(val, self.id, loc, &mut self.tex_uniforms);
+            T::set_uniform_impl(val, self.id(), loc, self.data.tex_uniforms.borrow_mut());
         }
     }
 
-    pub fn set_uniform_val(&mut self, uniform: Uniform) {
+    pub fn set_uniform_val(&self, uniform: Uniform) {
         match uniform {
             Uniform::Vector2(id, value) => {
                 self.set_uniform(&id, value);
@@ -220,20 +230,22 @@ impl DrawShader {
         }
     }
 
-    pub fn uniform_tex2d_id(&mut self, name: &str, id: u32) {
+    pub fn uniform_tex2d_id(&self, name: &str, id: u32) {
         let name_ptr = std::ffi::CString::new(name).unwrap().into_raw();
         let loc: GLint = unsafe { gl::GetUniformLocation(self.id(), name_ptr as *const i8) };
 
-        if !self.tex_uniforms.contains_key(&loc) {
-            let slot = self.tex_uniforms.len() as u32;
+        let mut tex_uniforms = self.data.tex_uniforms.borrow_mut();
+
+        if !tex_uniforms.contains_key(&loc) {
+            let slot = tex_uniforms.len() as u32;
 
             unsafe {
                 gl::ProgramUniform1i(self.id(), loc, slot as GLint);
             }
-            self.tex_uniforms.insert(loc, slot);
+            tex_uniforms.insert(loc, slot);
         }
 
-        let slot = self.tex_uniforms[&loc];
+        let slot = tex_uniforms[&loc];
 
         unsafe {
             gl::ActiveTexture(gl::TEXTURE0 + slot);
@@ -244,8 +256,10 @@ impl DrawShader {
 
 impl Drop for DrawShader {
     fn drop(&mut self) {
-        unsafe {
-            gl::DeleteProgram(self.id);
+        if Rc::strong_count(&self.data) == 1 {
+            unsafe {
+                gl::DeleteProgram(self.id());
+            }
         }
     }
 }

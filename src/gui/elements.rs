@@ -402,7 +402,7 @@ impl Widget for Text {
         builder.add_text(
             &self.text,
             &self.font,
-            self.size().to_pixels(1.0),
+            self.size(),
             self.color,
             self.align,
             self.font_size.to_pixels(self.size().minxy(), 1.0),
@@ -413,6 +413,7 @@ impl Widget for Text {
     }
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum ButtonState {
     Normal,
     Hovered,
@@ -457,7 +458,7 @@ impl Default for Button {
             size: Default::default(),
             text: Default::default(),
             text_color: Vec4::WHITE,
-            font: Default::default(),
+            font: "sans-serif".to_owned(),
             font_size: Default::default(),
             background: ButtonBckg::Fill(Vec4::grey(0.1)),
             callback: Default::default(),
@@ -503,69 +504,82 @@ impl Widget for Button {
         EventResponse::HandledRedraw
     }
     fn on_draw_build(&self, builder: &mut DrawBuilder) {
-        let clr = match self.background {
-            ButtonBckg::Cirlce(c) | ButtonBckg::Fill(c) | ButtonBckg::RoundRect(c, _) => {
-                let intensity = c.intensity();
-                let bckg_clr_direction = if intensity < 0.5 {
-                    Vec4::new(1.0, 1.0, 1.0, c.w)
-                } else {
-                    Vec4::new(0.0, 0.0, 0.0, c.w)
-                };
-                let bckg_clr = match self.private.state {
-                    ButtonState::Normal => c,
-                    ButtonState::Hovered => c * 0.9 + bckg_clr_direction * 0.1,
-                    ButtonState::Pressed => c * 0.95 + bckg_clr_direction * 0.05,
-                };
-                bckg_clr
-            }
-            ButtonBckg::Image(_, c_normal, c_hovered, c_pressed) => match self.private.state {
-                ButtonState::Normal => c_normal,
-                ButtonState::Hovered => c_hovered,
-                ButtonState::Pressed => c_pressed,
-            },
-            ButtonBckg::None => {
-                return;
-            }
-        };
-        let size = self.size().to_pixels(1.0);
-        match self.background.clone() {
-            ButtonBckg::Cirlce(_) => {
-                let radius = size.minxy();
-                let offset = size / 2.0;
-                let cirlce = |r| Vec2::pol(radius, r * PI * 2.0) + size / 2.0 + offset;
-                builder.add_clr_convex(cirlce, clr, (radius * 2.0 * PI).floor() as usize, true);
-            }
-            ButtonBckg::Fill(_) => {
-                builder.add_clr_rect(Rect::from_min_max(Vec2::origin(), size), clr);
-            }
-            ButtonBckg::RoundRect(_, radius) => {
-                let round_rect = |r| {
-                    let s = size / 2.0 - Vec2::new_xy(radius);
-
-                    let circle_mid = size / 2.0
-                        + match r {
-                            x if x < 0.25 => s,
-                            x if x < 0.5 => s * Vec2::new(-1.0, 1.0),
-                            x if x < 0.75 => s * Vec2::new(-1.0, -1.0),
-                            _ => s * Vec2::new(1.0, -1.0),
-                        };
-                    Vec2::pol(radius, r * PI * 2.0) + circle_mid
-                };
-                builder.add_clr_convex(round_rect, clr, (radius * 2.0 * PI).floor() as usize, true);
-            }
-            ButtonBckg::Image(name, _, _, _) => {
-                builder.add_tex_rect(
-                    Rect::from_min_max(Vec2::origin(), size),
-                    Rect::unit(),
-                    &name,
-                    clr,
-                );
-            }
-            ButtonBckg::None => {}
-        }
+        build_draw_for_button(
+            builder,
+            self.background.clone(),
+            self.private.state,
+            self.size(),
+        );
     }
     fn size(&self) -> Vec2px {
         self.private.real_size
+    }
+}
+
+fn build_draw_for_button(
+    builder: &mut DrawBuilder,
+    background: ButtonBckg,
+    state: ButtonState,
+    size: Vec2px,
+) {
+    let clr = match background {
+        ButtonBckg::Cirlce(c) | ButtonBckg::Fill(c) | ButtonBckg::RoundRect(c, _) => {
+            let intensity = c.intensity();
+            let bckg_clr_direction = if intensity < 0.5 {
+                Vec4::new(1.0, 1.0, 1.0, c.w)
+            } else {
+                Vec4::new(0.0, 0.0, 0.0, c.w)
+            };
+            let bckg_clr = match state {
+                ButtonState::Normal => c,
+                ButtonState::Hovered => c * 0.9 + bckg_clr_direction * 0.1,
+                ButtonState::Pressed => c * 0.95 + bckg_clr_direction * 0.05,
+            };
+            bckg_clr
+        }
+        ButtonBckg::Image(_, c_normal, c_hovered, c_pressed) => match state {
+            ButtonState::Normal => c_normal,
+            ButtonState::Hovered => c_hovered,
+            ButtonState::Pressed => c_pressed,
+        },
+        ButtonBckg::None => {
+            return;
+        }
+    };
+    match background {
+        ButtonBckg::Cirlce(_) => {
+            let radius = size.minxy();
+            let offset = size / 2.0;
+            let cirlce = |r| Vec2px::pol(radius, r * PI * 2.0) + size / 2.0 + offset;
+            builder.add_clr_convex(cirlce, clr, (radius * 2.0 * PI).floor() as usize, true);
+        }
+        ButtonBckg::Fill(_) => {
+            builder.add_clr_rect(Rect::from_min_max(Vec2::origin(), size.as_vec2()), clr);
+        }
+        ButtonBckg::RoundRect(_, radius) => {
+            let round_rect = |r| {
+                let s = size / 2.0 - Vec2px::new_xy(radius);
+
+                let circle_mid = size / 2.0
+                    + match r {
+                        x if x < 0.25 => s,
+                        x if x < 0.5 => s * Vec2px::new(-1.0, 1.0),
+                        x if x < 0.75 => s * Vec2px::new(-1.0, -1.0),
+                        _ => s * Vec2px::new(1.0, -1.0),
+                    };
+                Vec2px::pol(radius, r * PI * 2.0) + circle_mid
+            };
+            builder.add_clr_convex(round_rect, clr, (radius * 2.0 * PI).floor() as usize, true);
+        }
+        ButtonBckg::Image(name, _, _, _) => {
+            builder.add_tex_rect(
+                Rect::from_min_max(Vec2::origin(), size.as_vec2()),
+                Rect::unit(),
+                &name,
+                clr,
+            );
+        }
+        ButtonBckg::None => {}
     }
 }
 
@@ -596,7 +610,7 @@ impl Default for Toggle {
             on_text: Default::default(),
             off_text: Default::default(),
             text_color: Vec4::WHITE,
-            font: Default::default(),
+            font: "sans-serif".to_owned(),
             font_size: Default::default(),
             background: ButtonBckg::Fill(Vec4::grey(0.1)),
             callback: Default::default(),
@@ -629,66 +643,12 @@ impl Widget for Toggle {
         EventResponse::HandledRedraw
     }
     fn on_draw_build(&self, builder: &mut DrawBuilder) {
-        let clr = match self.background {
-            ButtonBckg::Cirlce(c) | ButtonBckg::Fill(c) | ButtonBckg::RoundRect(c, _) => {
-                let intensity = c.intensity();
-                let bckg_clr_direction = if intensity < 0.5 {
-                    Vec4::new(1.0, 1.0, 1.0, c.w)
-                } else {
-                    Vec4::new(0.0, 0.0, 0.0, c.w)
-                };
-                let bckg_clr = match self.private.state {
-                    ButtonState::Normal => c,
-                    ButtonState::Hovered => c * 0.9 + bckg_clr_direction * 0.1,
-                    ButtonState::Pressed => c * 0.95 + bckg_clr_direction * 0.05,
-                };
-                bckg_clr
-            }
-            ButtonBckg::Image(_, c_normal, c_hovered, c_pressed) => match self.private.state {
-                ButtonState::Normal => c_normal,
-                ButtonState::Hovered => c_hovered,
-                ButtonState::Pressed => c_pressed,
-            },
-            ButtonBckg::None => {
-                return;
-            }
-        };
-        let size = self.size().to_pixels(1.0);
-        match self.background.clone() {
-            ButtonBckg::Cirlce(_) => {
-                let radius = size.minxy();
-                let offset = size / 2.0;
-                let cirlce = |r| Vec2::pol(radius, r * PI * 2.0) + size / 2.0 + offset;
-                builder.add_clr_convex(cirlce, clr, (radius * 2.0 * PI).floor() as usize, true);
-            }
-            ButtonBckg::Fill(_) => {
-                builder.add_clr_rect(Rect::from_min_max(Vec2::origin(), size), clr);
-            }
-            ButtonBckg::RoundRect(_, radius) => {
-                let round_rect = |r| {
-                    let s = size / 2.0 - Vec2::new_xy(radius);
-
-                    let circle_mid = size / 2.0
-                        + match r {
-                            x if x < 0.25 => s,
-                            x if x < 0.5 => s * Vec2::new(-1.0, 1.0),
-                            x if x < 0.75 => s * Vec2::new(-1.0, -1.0),
-                            _ => s * Vec2::new(1.0, -1.0),
-                        };
-                    Vec2::pol(radius, r * PI * 2.0) + circle_mid
-                };
-                builder.add_clr_convex(round_rect, clr, (radius * 2.0 * PI).floor() as usize, true);
-            }
-            ButtonBckg::Image(name, _, _, _) => {
-                builder.add_tex_rect(
-                    Rect::from_min_max(Vec2::origin(), size),
-                    Rect::unit(),
-                    &name,
-                    clr,
-                );
-            }
-            ButtonBckg::None => {}
-        }
+        build_draw_for_button(
+            builder,
+            self.background.clone(),
+            self.private.state,
+            self.size(),
+        );
 
         builder.add_text(
             if self.on {
@@ -697,7 +657,7 @@ impl Widget for Toggle {
                 &self.off_text
             },
             &self.font,
-            self.size().to_pixels(1.0),
+            self.size(),
             self.text_color,
             Default::default(),
             self.font_size.to_pixels(self.size().minxy(), 1.0),

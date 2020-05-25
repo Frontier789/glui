@@ -1,15 +1,16 @@
 extern crate gl;
 extern crate glutin;
 
-use std::collections::HashMap;
 use std::collections::HashSet;
 use std::mem::swap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::*;
+use std::sync::Arc;
+use std::thread;
+use std::time::{Duration, Instant};
 
-use self::glutin::event::*;
 use tools::*;
 
-use super::actor::*;
 use super::glutin_cont::*;
 use super::glutin_util::*;
 use super::glutin_win::*;
@@ -21,22 +22,38 @@ use super::render_target::*;
 use super::static_world::*;
 use super::system::*;
 
+use self::glutin::event::*;
 use self::glutin::platform::desktop::EventLoopExtDesktop;
+use mecs::render_pipeline::DefaultPipeline;
+use mecs::RenderPipeline;
+use mecs::SystemSet;
 
-#[derive(Default)]
 pub struct World {
     static_world: StaticWorld,
-    systems: HashMap<SystemId, Box<dyn System>>,
-    actors: HashMap<ActorId, Box<dyn Actor>>,
-    next_actor_id: usize,
+    systems: SystemSet,
     loop_data: MessageLoopData,
-    ui_aware_actors: HashSet<ActorId>,
+    render_pipeline: Box<dyn RenderPipeline>,
     ui_aware_systems: HashSet<SystemId>,
     running: bool,
 }
 
-fn clone_glutin_event(event: &GlutinEvent<'static>) -> GlutinEvent<'static> {
-    let mut cloned = GlutinEvent::<'static>::CloseRequested;
+impl Default for World {
+    fn default() -> Self {
+        World {
+            static_world: Default::default(),
+            systems: Default::default(),
+            loop_data: Default::default(),
+            render_pipeline: Box::new(DefaultPipeline {
+                bgcolor: Vec3::new(0.3, 0.3, 0.3),
+            }),
+            ui_aware_systems: Default::default(),
+            running: Default::default(),
+        }
+    }
+}
+
+fn clone_window_event(event: &GlutinWindowEvent<'static>) -> GlutinWindowEvent<'static> {
+    let mut cloned = GlutinWindowEvent::<'static>::CloseRequested;
     unsafe {
         std::ptr::copy_nonoverlapping(event, &mut cloned, 1);
     }
@@ -44,26 +61,43 @@ fn clone_glutin_event(event: &GlutinEvent<'static>) -> GlutinEvent<'static> {
 }
 
 impl World {
+    pub fn default_update_interval() -> Duration {
+        Duration::from_millis(30)
+    }
+
     pub fn new() -> World {
         let (sender, receiver) = channel();
         World {
-            loop_data: MessageLoopData::HandRolled(sender, receiver),
+            loop_data: MessageLoopData::HandRolled(HandrolledMsgLoopData {
+                sender,
+                receiver,
+                update_interval: Self::default_update_interval(),
+            }),
             ..Default::default()
         }
     }
     pub fn new_win(size: Vec2, title: &str, bgcolor: Vec3) -> World {
         World {
-            loop_data: MessageLoopData::GlutinWindowed(GlutinWindowData::new(size, title, bgcolor)),
+            loop_data: MessageLoopData::GlutinWindowed(GlutinWindowData::new(
+                size,
+                title,
+                bgcolor,
+                Self::default_update_interval(),
+            )),
+            render_pipeline: Box::new(DefaultPipeline { bgcolor }),
             ..Default::default()
         }
     }
     pub fn new_winless(bgcolor: Vec3) -> Result<World, glutin::CreationError> {
         Ok(World {
-            loop_data: MessageLoopData::GlutinWindowless(GlutinContextData::new(bgcolor)?),
+            loop_data: MessageLoopData::GlutinWindowless(GlutinContextData::new(
+                bgcolor,
+                Self::default_update_interval(),
+            )?),
             ..Default::default()
         })
     }
-    pub fn render_target(&self) -> Option<RenderTarget> {
+    pub fn window_info(&self) -> Option<WindowInfo> {
         match &self.loop_data {
             MessageLoopData::GlutinWindowed(win) => Some(win.render_target()),
             MessageLoopData::GlutinWindowless(cont) => Some(cont.render_target()),
@@ -77,45 +111,37 @@ impl World {
         &mut self.static_world
     }
 
+    pub fn system<S>(&self, id: SystemId) -> Option<&S>
+    where
+        S: System + 'static,
+    {
+        self.systems.system::<S>(id)
+    }
+    pub fn system_mut<S>(&mut self, id: SystemId) -> Option<&mut S>
+    where
+        S: System + 'static,
+    {
+        self.systems.system_mut::<S>(id)
+    }
+    pub fn system_boxed(&self, id: SystemId) -> Option<&Box<dyn System>> {
+        self.systems.system_boxed(id)
+    }
+    pub fn system_boxed_mut(&mut self, id: SystemId) -> Option<&mut Box<dyn System>> {
+        self.systems.system_boxed_mut(id)
+    }
+
     pub fn add_system<S>(&mut self, system: S) -> SystemId
     where
         S: System + 'static,
     {
-        let id = SystemId::of::<S>();
-        self.systems.insert(id, Box::new(system));
-        id
+        self.systems.add_system(system)
     }
     pub fn make_system_ui_aware(&mut self, id: SystemId) {
         self.ui_aware_systems.insert(id);
     }
-    fn next_actor_id(&mut self) -> ActorId {
-        let id = ActorId(self.next_actor_id);
-        self.next_actor_id += 1;
-        id
-    }
-    pub fn add_actor<A>(&mut self, actor: A) -> ActorId
-    where
-        A: Actor + 'static,
-    {
-        let id = self.next_actor_id();
-        self.actors.insert(id, Box::new(actor));
-        id
-    }
-    pub fn add_actor_with<F, A>(&mut self, fun: F) -> ActorId
-    where
-        F: FnOnce(ActorId) -> A,
-        A: Actor + 'static,
-    {
-        let id = self.next_actor_id();
-        self.actors.insert(id, Box::new(fun(id)));
-        id
-    }
-    pub fn del_actor(&mut self, id: ActorId) {
-        self.actors.remove(&id);
-        self.ui_aware_actors.remove(&id);
-    }
-    pub fn make_actor_ui_aware(&mut self, id: ActorId) {
-        self.ui_aware_actors.insert(id);
+    pub fn del_system(&mut self, id: SystemId) {
+        self.systems.del_system(id);
+        self.ui_aware_systems.remove(&id);
     }
 
     pub fn deliver_all_messages(&mut self) {
@@ -127,24 +153,21 @@ impl World {
         let mut messages = vec![];
         swap(&mut self.static_world.queued_messages, &mut messages);
         for msg in messages.drain(0..) {
+            // println!("delivering {:?}", msg);
             match msg.target {
+                MessageTarget::Broadcast => {
+                    for (_, system) in self.systems.all_systems_mut() {
+                        system.receive(&msg.payload, &mut self.static_world);
+                    }
+                }
                 MessageTarget::System(id) => {
                     self.systems
-                        .get_mut(&id)
+                        .system_boxed_mut(id)
                         .expect(&format!(
                             "Message {:?} sent to non-existing system!",
                             msg.payload
                         ))
-                        .receive(msg.payload, &mut self.static_world);
-                }
-                MessageTarget::Actor(id) => {
-                    self.actors
-                        .get_mut(&id)
-                        .expect(&format!(
-                            "Message {:?} sent to non-existing actor!",
-                            msg.payload
-                        ))
-                        .receive(msg.payload, &mut self.static_world);
+                        .receive(&msg.payload, &mut self.static_world);
                 }
                 MessageTarget::Root => {
                     if msg.payload.is::<message::Exit>() {
@@ -158,7 +181,7 @@ impl World {
     }
     pub fn channel(&mut self) -> MessageChannel {
         match &self.loop_data {
-            MessageLoopData::HandRolled(sender, _receiver) => {
+            MessageLoopData::HandRolled(HandrolledMsgLoopData { sender, .. }) => {
                 MessageChannel::from_sender(sender.clone())
             }
             MessageLoopData::GlutinWindowed(win) => {
@@ -179,7 +202,7 @@ impl World {
         self.running = true;
 
         match self.loop_data {
-            MessageLoopData::HandRolled(_, _) => {
+            MessageLoopData::HandRolled(_) => {
                 self.owned_msg_loop();
             }
             MessageLoopData::GlutinWindowed(_) => {
@@ -193,56 +216,91 @@ impl World {
             }
         }
     }
+    fn msg_loop_updater(update_interval: Duration, sender: MessageChannel) -> Arc<AtomicBool> {
+        let updates_running = Arc::new(AtomicBool::new(true));
+        let updates_running_clone = updates_running.clone();
+
+        thread::spawn(move || {
+            let mut sleep_until = Instant::now() + update_interval;
+
+            while updates_running.load(Ordering::Relaxed) {
+                if let Err(_) = sender.broadcast(message::Update(update_interval)) {
+                    break;
+                };
+                thread::sleep(sleep_until - Instant::now());
+                sleep_until += update_interval;
+            }
+        });
+
+        updates_running_clone
+    }
     fn owned_msg_loop(mut self) {
         let mut loop_data = MessageLoopData::Consumed;
         std::mem::swap(&mut loop_data, &mut self.loop_data);
-        if let MessageLoopData::HandRolled(_, receiver) = loop_data {
+        if let MessageLoopData::HandRolled(HandrolledMsgLoopData {
+            sender,
+            receiver,
+            update_interval,
+        }) = loop_data
+        {
+            let updates_running =
+                Self::msg_loop_updater(update_interval, MessageChannel::from_sender(sender));
+
             while self.running {
                 let msg = receiver.recv().unwrap();
                 self.static_world.send_annotated(msg);
                 self.deliver_all_messages();
             }
+            updates_running.store(false, Ordering::Relaxed);
         }
     }
-    fn ui_aware_targets(&self) -> Vec<MessageTarget> {
-        self.ui_aware_actors
-            .iter()
-            .map(|id| MessageTarget::from(*id))
-            .chain(
-                self.ui_aware_systems
-                    .iter()
-                    .map(|id| MessageTarget::from(*id)),
-            )
-            .collect()
+    fn send_to_ui_aware(&mut self, event: UiEvent) {
+        for id in &self.ui_aware_systems {
+            self.static_world.send(*id, event.clone());
+        }
     }
-    fn send_glutin_event_to_ui_aware(&mut self, event: GlutinEvent) {
-        if let Some(event) = event.to_static() {
-            for id in self.ui_aware_targets() {
-                self.static_world
-                    .send(id, UiEvent::GlutinEvent(clone_glutin_event(&event)));
+    fn glutin_update_control(
+        &mut self,
+        event: &Event<AnnotatedMessage>,
+        control_flow: &mut GlutinControlFlow,
+        update_interval: Duration,
+    ) -> bool {
+        match event {
+            Event::NewEvents(StartCause::Init) => {
+                *control_flow = GlutinControlFlow::WaitUntil(Instant::now() + update_interval);
             }
+            Event::NewEvents(StartCause::ResumeTimeReached {
+                requested_resume, ..
+            }) => {
+                *control_flow = GlutinControlFlow::WaitUntil(*requested_resume + update_interval);
+                self.static_world
+                    .broadcast(message::Update(update_interval));
+                self.deliver_all_messages();
+                return true;
+            }
+            _ => {}
         }
-    }
-    fn send_to_ui_aware(&mut self, event: ClonableUiEvent) {
-        for id in self.ui_aware_targets() {
-            self.static_world.send(id, UiEvent::from(event));
-        }
+        false
     }
     fn glutin_cont_msg_loop(mut self) {
         let mut loop_data = MessageLoopData::Consumed;
         std::mem::swap(&mut loop_data, &mut self.loop_data);
 
         if let MessageLoopData::GlutinWindowless(data) = loop_data {
-            let (mut event_loop, _context, _bgcolor) = data.unpack();
+            let GlutinContextData {
+                mut event_loop,
+                update_interval,
+                ..
+            } = data;
 
-            event_loop.run_return(move |event, _, control_flow| {
-                *control_flow = GlutinControlFlow::Wait;
+            event_loop.run_return(move |event, _, mut control_flow| {
+                self.glutin_update_control(&event, &mut control_flow, update_interval);
                 match event {
                     Event::UserEvent(msg) => {
                         self.static_world.send_annotated(msg);
                     }
                     Event::MainEventsCleared => {
-                        self.send_to_ui_aware(ClonableUiEvent::EventsCleared);
+                        self.send_to_ui_aware(UiEvent::EventsCleared);
                         self.deliver_all_messages();
                     }
                     _ => (),
@@ -257,37 +315,45 @@ impl World {
     fn glutin_win_msg_loop(mut self) {
         let mut loop_data = MessageLoopData::Consumed;
         std::mem::swap(&mut loop_data, &mut self.loop_data);
-        if let MessageLoopData::GlutinWindowed(win) = loop_data {
-            let (mut event_loop, win, bgcolor) = win.unpack();
-            event_loop.run_return(move |event, _, control_flow| {
-                // println!("Event received {:?}", event);
-                *control_flow = GlutinControlFlow::Wait;
+        if let MessageLoopData::GlutinWindowed(data) = loop_data {
+            let GlutinWindowData {
+                mut event_loop,
+                gl_window: win,
+                bgcolor: _,
+                update_interval,
+            } = data;
+
+            event_loop.run_return(move |event, _, mut control_flow| {
+                if self.glutin_update_control(&event, &mut control_flow, update_interval) {
+                    win.window().request_redraw();
+                }
                 match event {
                     Event::WindowEvent { event, .. } => {
                         self.glutin_window_event(&event);
-                        self.send_glutin_event_to_ui_aware(event);
-                        self.deliver_all_messages();
                         win.window().request_redraw();
+
+                        if let Some(static_event) = event.to_static() {
+                            self.send_to_ui_aware(UiEvent::WindowEvent(static_event));
+                            self.deliver_all_messages();
+                        }
+                    }
+                    Event::DeviceEvent { event, .. } => {
+                        self.send_to_ui_aware(UiEvent::DeviceEvent(event));
+                        self.deliver_all_messages();
                     }
                     Event::RedrawRequested(..) => {
-                        unsafe {
-                            gl::ClearColor(bgcolor.x, bgcolor.y, bgcolor.z, 1.0);
-                            gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
-                        }
-                        self.send_to_ui_aware(ClonableUiEvent::Redraw);
-                        self.deliver_all_messages(); // FIXME: don't deliver all
+                        self.render_pipeline
+                            .render(&mut self.static_world, &self.ui_aware_systems);
+                        self.deliver_all_messages(); // FIXME: don't deliver all all the time
                         win.swap_buffers().unwrap();
                     }
-                    glutin::event::Event::UserEvent(msg) => {
+                    Event::UserEvent(msg) => {
                         self.static_world.send_annotated(msg);
                     }
-                    glutin::event::Event::MainEventsCleared => {
-                        self.send_to_ui_aware(ClonableUiEvent::EventsCleared);
+                    Event::MainEventsCleared => {
+                        self.send_to_ui_aware(UiEvent::EventsCleared);
                         self.deliver_all_messages();
                     }
-                    // glutin::event::Event::RedrawEventsCleared => {
-                    //     win.window().request_redraw();
-                    // }
                     _ => (),
                 }
                 if !self.running {
@@ -319,26 +385,23 @@ impl World {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
-enum ClonableUiEvent {
-    Redraw,
-    EventsCleared,
-}
-
-impl From<ClonableUiEvent> for UiEvent {
-    fn from(cuiev: ClonableUiEvent) -> UiEvent {
-        match cuiev {
-            ClonableUiEvent::Redraw => UiEvent::Redraw,
-            ClonableUiEvent::EventsCleared => UiEvent::EventsCleared,
-        }
-    }
-}
-
 #[derive(Debug)]
 pub enum UiEvent {
-    GlutinEvent(GlutinEvent<'static>),
+    DeviceEvent(GlutinDeviceEvent),
+    WindowEvent(GlutinWindowEvent<'static>),
     Redraw,
     EventsCleared,
+}
+
+impl Clone for UiEvent {
+    fn clone(&self) -> Self {
+        match self {
+            UiEvent::DeviceEvent(ev) => UiEvent::DeviceEvent(ev.clone()),
+            UiEvent::WindowEvent(ev) => UiEvent::WindowEvent(clone_window_event(ev)),
+            UiEvent::Redraw => UiEvent::Redraw,
+            UiEvent::EventsCleared => UiEvent::EventsCleared,
+        }
+    }
 }
 
 impl Message for UiEvent {}

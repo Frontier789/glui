@@ -1,5 +1,5 @@
-use super::gltraits::GlNum;
 use super::gl::types::*;
+use super::gltraits::GlNum;
 use std::ffi::c_void;
 use std::marker::PhantomData;
 
@@ -17,7 +17,7 @@ impl<T: GlNum> Buffer<T> {
             gl::CreateBuffers(1, &mut id);
         }
         Buffer {
-            id: id,
+            id,
             size: 0,
             _data_type: PhantomData,
         }
@@ -80,7 +80,7 @@ impl<T: GlNum> Buffer<T> {
         unsafe { gl::BindBuffer(gl::ARRAY_BUFFER, self.id) };
     }
 
-    pub fn as_base_type(mut self) -> Buffer<T::BaseType>
+    pub fn into_base_type(mut self) -> Buffer<T::BaseType>
     where
         T::BaseType: GlNum,
     {
@@ -93,7 +93,7 @@ impl<T: GlNum> Buffer<T> {
         }
     }
 
-    pub fn as_type<U>(mut self) -> Buffer<U>
+    pub fn into_type<U>(mut self) -> Buffer<U>
     where
         U: GlNum<BaseType = T>,
     {

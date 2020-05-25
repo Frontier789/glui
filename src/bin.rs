@@ -17,11 +17,11 @@ use gui::elements::*;
 use gui::widget_parser::StoredCallback;
 use gui::*;
 use mecs::*;
-use tools::camera::Camera;
 use tools::*;
 
 #[macro_use]
 mod gui;
+mod graphics;
 mod mecs;
 mod tools;
 
@@ -123,7 +123,7 @@ fn main() {
     let mut w: World = World::new_win(Vec2::new(640.0, 480.0), "", Vec3::grey(0.04));
 
     let mut gui = GuiContext::new(
-        w.render_target().unwrap(),
+        w.window_info().unwrap(),
         true,
         Data {
             goat: 0,
@@ -131,10 +131,9 @@ fn main() {
             show_red: true,
         },
     );
-    gui.init_gl_res();
     gui.rebuild_gui();
-    let id = w.add_actor(gui);
-    w.make_actor_ui_aware(id);
+    let id = w.add_system(gui);
+    w.make_system_ui_aware(id);
     w.run();
 }
 

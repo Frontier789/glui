@@ -1,15 +1,16 @@
 extern crate gl;
 extern crate image;
 
-use super::Vec2;
 use super::gl::types::*;
+use super::image::buffer::ConvertBuffer;
 use super::image::io::Reader;
 use super::image::GenericImageView;
-use super::image::buffer::ConvertBuffer;
+use super::Vec2;
 
 pub trait Texture {
     fn id(&self) -> u32;
     fn bind(&self);
+    fn size_2d(&self) -> (usize, usize);
 }
 
 #[derive(Debug)]
@@ -19,16 +20,19 @@ pub struct RgbaTexture {
     height: usize,
 }
 
-
 impl Texture for RgbaTexture {
     fn id(&self) -> u32 {
         self.id
     }
-    
+
     fn bind(&self) {
         unsafe {
             gl::BindTexture(gl::TEXTURE_2D, self.id);
         }
+    }
+
+    fn size_2d(&self) -> (usize, usize) {
+        (self.width, self.height)
     }
 }
 
@@ -38,7 +42,7 @@ fn alignment_from_format_u8(format: GLenum) -> GLint {
         gl::RG => 2,
         gl::RGB | gl::BGR => 1,
         gl::RGBA | gl::BGRA => 4,
-        _ => panic!("Invalid Image Format")
+        _ => panic!("Invalid Image Format"),
     }
 }
 
@@ -63,11 +67,7 @@ impl RgbaTexture {
                 height as GLsizei,
             );
         }
-        RgbaTexture {
-            id: id,
-            width: width,
-            height: height,
-        }
+        RgbaTexture { id, width, height }
     }
 
     fn update(
@@ -83,7 +83,7 @@ impl RgbaTexture {
     ) {
         unsafe {
             gl::PixelStorei(gl::UNPACK_ALIGNMENT, alignment);
-                
+
             gl::TextureSubImage2D(
                 self.id(),
                 0,
@@ -145,6 +145,7 @@ impl RgbaTexture {
         let reader = Reader::open(file)?;
         let reader = reader.with_guessed_format()?;
         let img = reader.decode()?;
+        // image::imageops::flip_vertical_in_place(&mut img);
 
         let (w, h) = img.dimensions();
         let w = w as usize;
@@ -158,10 +159,18 @@ impl RgbaTexture {
                 let rgba_img: image::RgbaImage = img.convert();
                 Ok(RgbaTexture::from_ptr_u8(w, h, gl::RGBA, rgba_img.as_ptr()))
             }
-            image::DynamicImage::ImageRgb8(img) => Ok(RgbaTexture::from_ptr_u8(w, h, gl::RGB, img.as_ptr())),
-            image::DynamicImage::ImageRgba8(img) => Ok(RgbaTexture::from_ptr_u8(w, h, gl::RGBA, img.as_ptr())),
-            image::DynamicImage::ImageBgr8(img) => Ok(RgbaTexture::from_ptr_u8(w, h, gl::BGR, img.as_ptr())),
-            image::DynamicImage::ImageBgra8(img) => Ok(RgbaTexture::from_ptr_u8(w, h, gl::BGRA, img.as_ptr())),
+            image::DynamicImage::ImageRgb8(img) => {
+                Ok(RgbaTexture::from_ptr_u8(w, h, gl::RGB, img.as_ptr()))
+            }
+            image::DynamicImage::ImageRgba8(img) => {
+                Ok(RgbaTexture::from_ptr_u8(w, h, gl::RGBA, img.as_ptr()))
+            }
+            image::DynamicImage::ImageBgr8(img) => {
+                Ok(RgbaTexture::from_ptr_u8(w, h, gl::BGR, img.as_ptr()))
+            }
+            image::DynamicImage::ImageBgra8(img) => {
+                Ok(RgbaTexture::from_ptr_u8(w, h, gl::BGRA, img.as_ptr()))
+            }
             image::DynamicImage::ImageLuma16(img) => {
                 let rgb_img: image::RgbImage = img.convert();
                 Ok(RgbaTexture::from_ptr_u8(w, h, gl::RGB, rgb_img.as_ptr()))
@@ -180,7 +189,7 @@ impl RgbaTexture {
             }
         }
     }
-    pub fn into_image(&self) -> image::RgbaImage {
+    pub fn as_image(&self) -> image::RgbaImage {
         let mut img = image::RgbaImage::new(self.width as u32, self.height as u32);
         let buf_size = self.width * self.height * 4 * std::mem::size_of::<u8>();
         unsafe {

@@ -1,11 +1,13 @@
-use tools::*;
 use super::glutin_util::*;
 use super::render_target::*;
+use std::time::Duration;
+use tools::*;
 
 pub struct GlutinWindowData {
-    event_loop: GlutinEventLoop,
-    gl_window: GlutinGLWindow,
-    bgcolor: Vec3,
+    pub event_loop: GlutinEventLoop,
+    pub gl_window: GlutinGLWindow,
+    pub bgcolor: Vec3,
+    pub update_interval: Duration,
 }
 
 impl GlutinWindowData {
@@ -14,9 +16,11 @@ impl GlutinWindowData {
             .window()
             .set_cursor_icon(glutin::window::CursorIcon::Default);
         let gl_window = unsafe { gl_window.make_current().unwrap() };
-        
-        prepare_gl(bgcolor, |symbol| gl_window.get_proc_address(symbol) as *const _);
-        
+
+        prepare_gl(bgcolor, |symbol| {
+            gl_window.get_proc_address(symbol) as *const _
+        });
+
         gl_window.swap_buffers().unwrap();
         gl_window
     }
@@ -26,7 +30,7 @@ impl GlutinWindowData {
             .with_title(title)
             .with_inner_size(glutin::dpi::LogicalSize::new(size.x, size.y))
             .with_visible(false);
-            
+
         glutin::ContextBuilder::new()
             .with_vsync(true)
             .with_gl_profile(glutin::GlProfile::Core)
@@ -34,7 +38,7 @@ impl GlutinWindowData {
             .build_windowed(window_builder, &event_loop)
             .unwrap()
     }
-    pub fn new(size: Vec2, title: &str, bgcolor: Vec3) -> Self {
+    pub fn new(size: Vec2, title: &str, bgcolor: Vec3, update_interval: Duration) -> Self {
         let event_loop = glutin::event_loop::EventLoop::with_user_event();
         let gl_window = Self::initialize(Self::create_window(size, title, &event_loop), bgcolor);
         gl_window.window().set_visible(true);
@@ -42,11 +46,12 @@ impl GlutinWindowData {
             event_loop,
             gl_window,
             bgcolor,
+            update_interval,
         }
     }
-    pub fn render_target(&self) -> RenderTarget {
+    pub fn render_target(&self) -> WindowInfo {
         let win = self.gl_window.window();
-        RenderTarget {
+        WindowInfo {
             size: win.inner_size().into(),
             gui_scale: win.scale_factor() as f32,
             ..Default::default()
@@ -55,8 +60,5 @@ impl GlutinWindowData {
     }
     pub fn event_loop_proxy(&self) -> GlutinEventLoopProxy {
         self.event_loop.create_proxy()
-    }
-    pub fn unpack(self) -> (GlutinEventLoop,GlutinGLWindow,Vec3) {
-        (self.event_loop, self.gl_window, self.bgcolor)
     }
 }
