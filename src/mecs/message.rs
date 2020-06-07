@@ -3,7 +3,6 @@ use self::downcast_rs::impl_downcast;
 use self::downcast_rs::Downcast;
 use super::system::*;
 use std::fmt::Debug;
-use std::time::Duration;
 
 pub trait Message: Downcast + Debug + Send {}
 impl_downcast!(Message);
@@ -45,7 +44,3 @@ pub struct Exit {}
 impl Message for Exit {}
 
 pub const EXIT: Exit = Exit {};
-
-#[derive(Debug)]
-pub struct Update(pub Duration);
-impl Message for Update {}

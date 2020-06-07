@@ -9,6 +9,16 @@ use super::draw::*;
 use super::widget::*;
 
 #[derive(Default)]
+pub struct SkipCell {}
+
+impl_widget_building_for!(SkipCell);
+impl Widget for SkipCell {
+    fn size(&self) -> Vec2px {
+        Vec2px::zero()
+    }
+}
+
+#[derive(Default)]
 pub struct VertLayoutPriv {
     size: Vec2px,
 }
@@ -145,14 +155,14 @@ pub struct GridLayoutPrivate {
     real_size: Vec2px,
     child_id: usize,
     child_pos: Vec2px,
-    col_widths: Vec<f32>,
-    row_heights: Vec<f32>,
+    col_widths_unit: Vec<f32>,
+    row_heights_unit: Vec<f32>,
 }
 
 #[derive(Default)]
 pub struct GridLayout {
-    pub col_widths: Vec<f32>,
-    pub row_heights: Vec<f32>,
+    pub col_widths: Vec<GuiDimension>,
+    pub row_heights: Vec<GuiDimension>,
     pub size: WidgetSize,
     pub private: GridLayoutPrivate,
 }
@@ -162,16 +172,36 @@ impl Widget for GridLayout {
     fn constraint(&mut self, self_constraint: WidgetConstraints) {
         self.private.real_size = self.size.to_units(self_constraint.max_size);
         if self.row_heights.is_empty() {
-            self.row_heights.push(1.0);
+            self.row_heights.push(GuiDimension::Relative(1.0));
         }
         if self.col_widths.is_empty() {
-            self.col_widths.push(1.0);
+            self.col_widths.push(GuiDimension::Relative(1.0));
         }
         let s = self.size();
-        let sw = s.x / self.col_widths.iter().sum::<f32>();
-        let sh = s.y / self.row_heights.iter().sum::<f32>();
-        self.private.row_heights = self.row_heights.iter().map(|h| h * sh).collect();
-        self.private.col_widths = self.col_widths.iter().map(|w| w * sw).collect();
+        let tot_rel_w: f32 = self.col_widths.iter().map(|d| d.relative()).sum();
+        let tot_abs_w: f32 = self.col_widths.iter().map(|d| d.absolute()).sum();
+        let tot_rel_h: f32 = self.row_heights.iter().map(|d| d.relative()).sum();
+        let tot_abs_h: f32 = self.row_heights.iter().map(|d| d.absolute()).sum();
+        let unit_per_rel_w = if tot_rel_w == 0.0 {
+            1.0
+        } else {
+            (s.x - tot_abs_w) / tot_rel_w
+        };
+        let unit_per_rel_h = if tot_rel_h == 0.0 {
+            1.0
+        } else {
+            (s.y - tot_abs_h) / tot_rel_h
+        };
+        self.private.col_widths_unit = self
+            .col_widths
+            .iter()
+            .map(|w| w.to_units(unit_per_rel_w))
+            .collect();
+        self.private.row_heights_unit = self
+            .row_heights
+            .iter()
+            .map(|h| h.to_units(unit_per_rel_h))
+            .collect();
     }
     fn place_child(&mut self, _child_size: Vec2px, _child_descent: f32) -> WidgetPosition {
         let p = self.private.child_pos;
@@ -179,10 +209,10 @@ impl Widget for GridLayout {
         if (self.private.child_id + 1) % self.col_widths.len() == 0 {
             self.private.child_pos.x = 0.0;
             self.private.child_pos.y +=
-                self.private.row_heights[self.private.child_id / self.col_widths.len()];
+                self.private.row_heights_unit[self.private.child_id / self.col_widths.len()];
         } else {
             self.private.child_pos.x +=
-                self.private.col_widths[self.private.child_id % self.col_widths.len()];
+                self.private.col_widths_unit[self.private.child_id % self.col_widths.len()];
         }
         self.private.child_id += 1;
         p.into()
@@ -190,8 +220,8 @@ impl Widget for GridLayout {
     fn child_constraint(&self) -> Option<WidgetConstraints> {
         Some(WidgetConstraints {
             max_size: Vec2px::new(
-                self.private.col_widths[self.private.child_id % self.col_widths.len()],
-                self.private.row_heights[self.private.child_id / self.col_widths.len()],
+                self.private.col_widths_unit[self.private.child_id % self.col_widths.len()],
+                self.private.row_heights_unit[self.private.child_id / self.col_widths.len()],
             ),
         })
     }
@@ -352,7 +382,7 @@ impl FontSize {
     pub fn to_pixels(&self, text_area: f32, gui_scale: f32) -> f32 {
         f32::max(
             match self {
-                FontSize::Em(x) => x * 24.0 * gui_scale,
+                FontSize::Em(x) => x * 20.0 * gui_scale,
                 FontSize::Relative(r) => r * text_area * gui_scale,
                 FontSize::RelativeSteps(r, (mn, mx), s) => {
                     let stepped = f32::round(r * text_area / s) * s;
@@ -833,5 +863,34 @@ impl Widget for Overlay {
     }
     fn size(&self) -> Vec2px {
         self.private.size
+    }
+}
+
+#[derive(Default)]
+pub struct LinesPrivate {
+    real_size: Vec2px,
+}
+
+#[derive(Default)]
+pub struct Lines {
+    pub size: WidgetSize,
+    pub lines: Vec<(GuiPoint, GuiPoint)>,
+    pub color: Vec4,
+    pub private: LinesPrivate,
+}
+
+impl_widget_building_for!(Lines);
+impl Widget for Lines {
+    fn constraint(&mut self, self_constraint: WidgetConstraints) {
+        self.private.real_size = self.size.to_units(self_constraint.max_size);
+    }
+    fn on_draw_build(&self, builder: &mut DrawBuilder) {
+        let s = self.size();
+        for (a, b) in &self.lines {
+            builder.add_line_strip(vec![a.to_units(s), b.to_units(s)], self.color);
+        }
+    }
+    fn size(&self) -> Vec2px {
+        self.private.real_size
     }
 }

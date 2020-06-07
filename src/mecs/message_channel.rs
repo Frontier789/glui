@@ -35,6 +35,13 @@ impl MessageChannel {
         self.send_annotated((target, message).into())
     }
 
+    pub fn send_to_root<M>(&self, message: M) -> Result<(), AnnotatedMessage>
+    where
+        M: Message,
+    {
+        self.send_annotated((MessageTarget::Root, message).into())
+    }
+
     pub fn broadcast<M>(&self, message: M) -> Result<(), AnnotatedMessage>
     where
         M: Message,

@@ -5,9 +5,9 @@ use self::rusttype::gpu_cache;
 use self::unicode_normalization::UnicodeNormalization;
 
 use gui::{Align, HAlign, VAlign};
-use tools::RgbaTexture;
 use tools::Vec2;
 use tools::{FontError, Rect};
+use tools::{RgbaTexture, Texture};
 
 pub struct Font {
     rt_font: rusttype::Font<'static>,
@@ -130,6 +130,7 @@ impl Font {
                     (rect.max.y - rect.min.y) as usize,
                     gl::RGBA,
                     data_a.as_ptr(),
+                    0,
                 );
             })
             .unwrap();

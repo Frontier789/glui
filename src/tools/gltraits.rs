@@ -1,7 +1,7 @@
 extern crate gl;
 
 use super::matrix4::Mat4;
-use super::tex2d::Texture;
+use super::texture::Texture;
 use super::vector2::Vec2;
 use super::vector3::Vec3;
 use super::vector4::Vec4;
@@ -16,6 +16,9 @@ pub trait GlNum: Clone + Copy {
     fn dim() -> u32;
     fn gl_type() -> u32;
     fn base_ptr(self) -> *const Self::BaseType;
+    fn item_size() -> usize {
+        Self::dim() as usize * std::mem::size_of::<Self::BaseType>()
+    }
 }
 
 impl GlNum for f32 {
@@ -27,6 +30,19 @@ impl GlNum for f32 {
         gl::FLOAT as u32
     }
     fn base_ptr(self) -> *const f32 {
+        &self
+    }
+}
+
+impl GlNum for u32 {
+    type BaseType = u32;
+    fn dim() -> u32 {
+        1
+    }
+    fn gl_type() -> u32 {
+        gl::UNSIGNED_INT as u32
+    }
+    fn base_ptr(self) -> *const u32 {
         &self
     }
 }

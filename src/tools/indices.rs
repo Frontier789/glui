@@ -3,13 +3,16 @@ use std::ops::Range;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Indices {
     None,
+    All,
     Range(Range<usize>),
     Vec(Vec<u32>),
+    Buffer,
+    BufferRange(Range<usize>),
 }
 
 impl Default for Indices {
     fn default() -> Self {
-        Self::None
+        Self::All
     }
 }
 

@@ -6,12 +6,8 @@ use super::image::buffer::ConvertBuffer;
 use super::image::io::Reader;
 use super::image::GenericImageView;
 use super::Vec2;
-
-pub trait Texture {
-    fn id(&self) -> u32;
-    fn bind(&self);
-    fn size_2d(&self) -> (usize, usize);
-}
+use tools::texture::alignment_from_format_u8;
+use tools::Texture;
 
 #[derive(Debug)]
 pub struct RgbaTexture {
@@ -34,15 +30,37 @@ impl Texture for RgbaTexture {
     fn size_2d(&self) -> (usize, usize) {
         (self.width, self.height)
     }
-}
 
-fn alignment_from_format_u8(format: GLenum) -> GLint {
-    match format {
-        gl::RED => 1,
-        gl::RG => 2,
-        gl::RGB | gl::BGR => 1,
-        gl::RGBA | gl::BGRA => 4,
-        _ => panic!("Invalid Image Format"),
+    fn gl_update(
+        &mut self,
+        x: usize,
+        y: usize,
+        width: usize,
+        height: usize,
+        format: GLenum,
+        type_: GLenum,
+        ptr: *const std::ffi::c_void,
+        alignment: GLint,
+        stride: usize,
+    ) {
+        unsafe {
+            gl::PixelStorei(gl::UNPACK_ALIGNMENT, alignment);
+            gl::PixelStorei(gl::UNPACK_ROW_LENGTH, stride as GLint);
+
+            gl::TextureSubImage2D(
+                self.id(),
+                0,
+                x as GLint,
+                y as GLint,
+                width as GLsizei,
+                height as GLsizei,
+                format,
+                type_,
+                ptr,
+            );
+
+            gl::PixelStorei(gl::UNPACK_ROW_LENGTH, 0);
+        }
     }
 }
 
@@ -55,7 +73,6 @@ impl RgbaTexture {
 
         unsafe {
             gl::TextureParameteri(id, gl::TEXTURE_MIN_FILTER, gl::LINEAR as GLint);
-            gl::TextureParameteri(id, gl::TEXTURE_MAG_FILTER, gl::LINEAR as GLint);
             gl::TextureParameteri(id, gl::TEXTURE_WRAP_S, gl::CLAMP_TO_EDGE as GLint);
             gl::TextureParameteri(id, gl::TEXTURE_WRAP_T, gl::CLAMP_TO_EDGE as GLint);
 
@@ -70,55 +87,6 @@ impl RgbaTexture {
         RgbaTexture { id, width, height }
     }
 
-    fn update(
-        &mut self,
-        x: usize,
-        y: usize,
-        width: usize,
-        height: usize,
-        format: GLenum,
-        type_: GLenum,
-        ptr: *const std::ffi::c_void,
-        alignment: GLint,
-    ) {
-        unsafe {
-            gl::PixelStorei(gl::UNPACK_ALIGNMENT, alignment);
-
-            gl::TextureSubImage2D(
-                self.id(),
-                0,
-                x as GLint,
-                y as GLint,
-                width as GLsizei,
-                height as GLsizei,
-                format,
-                type_,
-                ptr,
-            );
-        }
-    }
-
-    pub fn update_u8(
-        &mut self,
-        x: usize,
-        y: usize,
-        width: usize,
-        height: usize,
-        format: GLenum,
-        ptr: *const u8,
-    ) {
-        self.update(
-            x,
-            y,
-            width,
-            height,
-            format,
-            gl::UNSIGNED_BYTE,
-            ptr as *const std::ffi::c_void,
-            alignment_from_format_u8(format),
-        );
-    }
-
     pub fn from_ptr(
         width: usize,
         height: usize,
@@ -126,12 +94,19 @@ impl RgbaTexture {
         type_: GLenum,
         ptr: *const std::ffi::c_void,
         alignment: GLint,
+        stride: usize,
     ) -> RgbaTexture {
         let mut tex = RgbaTexture::new(width, height);
-        tex.update(0, 0, width, height, format, type_, ptr, alignment);
+        tex.gl_update(0, 0, width, height, format, type_, ptr, alignment, stride);
         tex
     }
-    pub fn from_ptr_u8(width: usize, height: usize, format: GLenum, ptr: *const u8) -> RgbaTexture {
+    pub fn from_ptr_u8(
+        width: usize,
+        height: usize,
+        format: GLenum,
+        ptr: *const u8,
+        stride: usize,
+    ) -> RgbaTexture {
         RgbaTexture::from_ptr(
             width,
             height,
@@ -139,6 +114,7 @@ impl RgbaTexture {
             gl::UNSIGNED_BYTE,
             ptr as *const std::ffi::c_void,
             alignment_from_format_u8(format),
+            stride,
         )
     }
     pub fn from_file(file: &str) -> image::ImageResult<RgbaTexture> {
@@ -153,39 +129,57 @@ impl RgbaTexture {
         match img {
             image::DynamicImage::ImageLuma8(img) => {
                 let rgb_img: image::RgbImage = img.convert();
-                Ok(RgbaTexture::from_ptr_u8(w, h, gl::RGB, rgb_img.as_ptr()))
+                Ok(RgbaTexture::from_ptr_u8(w, h, gl::RGB, rgb_img.as_ptr(), 0))
             }
             image::DynamicImage::ImageLumaA8(img) => {
                 let rgba_img: image::RgbaImage = img.convert();
-                Ok(RgbaTexture::from_ptr_u8(w, h, gl::RGBA, rgba_img.as_ptr()))
+                Ok(RgbaTexture::from_ptr_u8(
+                    w,
+                    h,
+                    gl::RGBA,
+                    rgba_img.as_ptr(),
+                    0,
+                ))
             }
             image::DynamicImage::ImageRgb8(img) => {
-                Ok(RgbaTexture::from_ptr_u8(w, h, gl::RGB, img.as_ptr()))
+                Ok(RgbaTexture::from_ptr_u8(w, h, gl::RGB, img.as_ptr(), 0))
             }
             image::DynamicImage::ImageRgba8(img) => {
-                Ok(RgbaTexture::from_ptr_u8(w, h, gl::RGBA, img.as_ptr()))
+                Ok(RgbaTexture::from_ptr_u8(w, h, gl::RGBA, img.as_ptr(), 0))
             }
             image::DynamicImage::ImageBgr8(img) => {
-                Ok(RgbaTexture::from_ptr_u8(w, h, gl::BGR, img.as_ptr()))
+                Ok(RgbaTexture::from_ptr_u8(w, h, gl::BGR, img.as_ptr(), 0))
             }
             image::DynamicImage::ImageBgra8(img) => {
-                Ok(RgbaTexture::from_ptr_u8(w, h, gl::BGRA, img.as_ptr()))
+                Ok(RgbaTexture::from_ptr_u8(w, h, gl::BGRA, img.as_ptr(), 0))
             }
             image::DynamicImage::ImageLuma16(img) => {
                 let rgb_img: image::RgbImage = img.convert();
-                Ok(RgbaTexture::from_ptr_u8(w, h, gl::RGB, rgb_img.as_ptr()))
+                Ok(RgbaTexture::from_ptr_u8(w, h, gl::RGB, rgb_img.as_ptr(), 0))
             }
             image::DynamicImage::ImageLumaA16(img) => {
                 let rgba_img: image::RgbaImage = img.convert();
-                Ok(RgbaTexture::from_ptr_u8(w, h, gl::RGBA, rgba_img.as_ptr()))
+                Ok(RgbaTexture::from_ptr_u8(
+                    w,
+                    h,
+                    gl::RGBA,
+                    rgba_img.as_ptr(),
+                    0,
+                ))
             }
             image::DynamicImage::ImageRgb16(img) => {
                 let rgb_img: image::RgbImage = img.convert();
-                Ok(RgbaTexture::from_ptr_u8(w, h, gl::RGB, rgb_img.as_ptr()))
+                Ok(RgbaTexture::from_ptr_u8(w, h, gl::RGB, rgb_img.as_ptr(), 0))
             }
             image::DynamicImage::ImageRgba16(img) => {
                 let rgba_img: image::RgbaImage = img.convert();
-                Ok(RgbaTexture::from_ptr_u8(w, h, gl::RGBA, rgba_img.as_ptr()))
+                Ok(RgbaTexture::from_ptr_u8(
+                    w,
+                    h,
+                    gl::RGBA,
+                    rgba_img.as_ptr(),
+                    0,
+                ))
             }
         }
     }

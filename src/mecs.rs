@@ -3,6 +3,9 @@ extern crate gl;
 extern crate glui_proc;
 
 pub use self::component::Component;
+pub use self::components::BodyComponent;
+pub use self::components::DataComponent;
+pub use self::components::DrawComponent;
 pub use self::entity::Entity;
 pub use self::glui_proc::Component;
 pub use self::glutin_cont::GlutinContextData;
@@ -24,9 +27,11 @@ pub use self::static_world::StaticWorld;
 pub use self::system::System;
 pub use self::system::SystemId;
 pub use self::system_set::SystemSet;
+pub use self::systems::DrawSystem;
 pub use self::world::World;
 
 pub mod component;
+pub mod components;
 pub mod entity;
 pub mod glutin_cont;
 pub mod glutin_util;
@@ -39,4 +44,5 @@ pub mod render_target;
 pub mod static_world;
 pub mod system;
 pub mod system_set;
+pub mod systems;
 pub mod world;

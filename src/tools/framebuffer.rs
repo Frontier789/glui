@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use tools::{Texture, Vec2};
 
 use self::gl::types::*;
+use std::fmt::Debug;
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum FrameBufferStatus {
@@ -65,7 +66,7 @@ struct AttachmentData {
     size: (usize, usize),
 }
 
-#[derive(Eq)]
+#[derive(Debug, Eq)]
 pub struct Framebuffer {
     id: u32,
     attachments: HashMap<FrameBufferAttachment, AttachmentData>,

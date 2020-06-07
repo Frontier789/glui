@@ -18,6 +18,7 @@ struct DrawObject {
     tex: Option<u32>,
     transparent: bool,
     depth: f32,
+    mode: DrawMode,
 }
 
 pub struct DrawBuilder<'a> {
@@ -43,6 +44,23 @@ impl<'a> DrawBuilder<'a> {
             offset: Vec3::zero(),
             draw_resources,
         }
+    }
+    pub fn add_line_strip(&mut self, points: Vec<Vec2px>, clr: Vec4) {
+        self.objects.push(DrawObject {
+            pts: offset(
+                points
+                    .iter()
+                    .map(|p| Vec3::from_vec2(p.to_pixels(self.gui_scale()), 0.0))
+                    .collect(),
+                self.offset,
+            ),
+            clr: DrawColor::Const(clr),
+            tpt: None,
+            tex: None,
+            transparent: false,
+            depth: self.offset.z,
+            mode: DrawMode::LineStrip,
+        })
     }
     pub fn add_clr_convex<FP>(&mut self, pos_fun: FP, clr: Vec4, n: usize, antialias: bool)
     where
@@ -111,6 +129,7 @@ impl<'a> DrawBuilder<'a> {
             tex: None,
             transparent: antialias,
             depth: self.offset.z,
+            mode: DrawMode::Triangles,
         })
     }
     pub fn add_clr_rect(&mut self, rct: Rect, clr: Vec4) {
@@ -125,6 +144,7 @@ impl<'a> DrawBuilder<'a> {
             tex: None,
             transparent: clr.w < 1.0,
             depth: self.offset.z,
+            mode: DrawMode::Triangles,
         })
     }
     pub fn add_tex_rect(&mut self, place_rct: Rect, cutout_rect: Rect, tex_name: &str, clr: Vec4) {
@@ -141,6 +161,7 @@ impl<'a> DrawBuilder<'a> {
             tex: self.draw_resources.texture_id(tex_name),
             transparent: true,
             depth: self.offset.z,
+            mode: DrawMode::Triangles,
         })
     }
     pub fn add_text(
@@ -173,6 +194,7 @@ impl<'a> DrawBuilder<'a> {
             tex: Some(font.tex.id()),
             transparent: true,
             depth: self.offset.z,
+            mode: DrawMode::Triangles,
         })
     }
 
@@ -194,7 +216,6 @@ impl<'a> DrawBuilder<'a> {
             .flatten()
             .collect();
 
-        let pts_count: usize = self.objects[beg..end].iter().map(|o| o.pts.len()).sum();
         let pbuf = Buffer::from_vec(pts);
         let cbuf = Buffer::from_vec(clr);
         let mut vao = VertexArray::new();
@@ -232,8 +253,7 @@ impl<'a> DrawBuilder<'a> {
         }
         render_seq.add_command(RenderCommand {
             vao,
-            mode: DrawMode::Triangles,
-            indices: (0..pts_count).into(),
+            mode: self.objects[beg].mode,
             shader,
             uniforms,
             transparent: self.objects[beg].transparent,
@@ -249,6 +269,7 @@ impl<'a> DrawBuilder<'a> {
                 o1.transparent
                     .cmp(&o2.transparent)
                     .then(o1.tex.cmp(&o2.tex))
+                    .then(o1.mode.cmp(&o2.mode))
             }
         };
         self.objects.sort_by(cmp_dobj);

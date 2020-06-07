@@ -215,6 +215,9 @@ impl DrawShader {
 
     pub fn set_uniform_val(&self, uniform: Uniform) {
         match uniform {
+            Uniform::Float(id, value) => {
+                self.set_uniform(&id, value);
+            }
             Uniform::Vector2(id, value) => {
                 self.set_uniform(&id, value);
             }
@@ -227,10 +230,21 @@ impl DrawShader {
             Uniform::Texture2D(id, value) => {
                 self.uniform_tex2d_id(&id, value);
             }
+            Uniform::TextureCube(id, value) => {
+                self.uniform_tex_cube_id(&id, value);
+            }
         }
     }
 
     pub fn uniform_tex2d_id(&self, name: &str, id: u32) {
+        self.uniform_texture_id(name, gl::TEXTURE_2D, id);
+    }
+
+    pub fn uniform_tex_cube_id(&self, name: &str, id: u32) {
+        self.uniform_texture_id(name, gl::TEXTURE_CUBE_MAP, id);
+    }
+
+    fn uniform_texture_id(&self, name: &str, target: GLenum, id: u32) {
         let name_ptr = std::ffi::CString::new(name).unwrap().into_raw();
         let loc: GLint = unsafe { gl::GetUniformLocation(self.id(), name_ptr as *const i8) };
 
@@ -249,7 +263,7 @@ impl DrawShader {
 
         unsafe {
             gl::ActiveTexture(gl::TEXTURE0 + slot);
-            gl::BindTexture(gl::TEXTURE_2D, id);
+            gl::BindTexture(target, id);
         }
     }
 }

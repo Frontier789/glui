@@ -2,6 +2,7 @@ use super::gl::types::*;
 use super::gltraits::GlNum;
 use std::ffi::c_void;
 use std::marker::PhantomData;
+use tools::BufferBindTarget;
 
 #[derive(Debug)]
 pub struct Buffer<T: GlNum> {
@@ -77,7 +78,10 @@ impl<T: GlNum> Buffer<T> {
         unsafe { Vec::from_raw_parts(ptr, cap, cap) }
     }
     pub fn bind(&self) {
-        unsafe { gl::BindBuffer(gl::ARRAY_BUFFER, self.id) };
+        self.bind_to_target(BufferBindTarget::Array);
+    }
+    pub fn bind_to_target(&self, target: BufferBindTarget) {
+        unsafe { gl::BindBuffer(target.into(), self.id) };
     }
 
     pub fn into_base_type(mut self) -> Buffer<T::BaseType>

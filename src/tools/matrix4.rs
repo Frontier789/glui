@@ -109,6 +109,19 @@ impl Mat4 {
             [0.0, 0.0, -1.0, 0.0],
         ])
     }
+    pub fn inv_perspective(fov: f32, aspect: f32, znear: f32, zfar: f32) -> Mat4 {
+        let zz = (zfar + znear) / (znear - zfar);
+        let zw = 2.0 * znear * zfar / (znear - zfar);
+
+        let tfov = 1.0 / (fov * 0.5).tan();
+
+        Mat4::from_arr_arr([
+            [aspect / tfov, 0.0, 0.0, 0.0],
+            [0.0, 1.0 / tfov, 0.0, 0.0],
+            [0.0, 0.0, 0.0, -1.0],
+            [0.0, 0.0, 1.0 / zw, zz / zw],
+        ])
+    }
 
     pub fn ortho(left: f32, bottom: f32, right: f32, top: f32, near: f32, far: f32) -> Mat4 {
         Mat4::from_arr_arr([

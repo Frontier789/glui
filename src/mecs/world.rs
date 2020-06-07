@@ -25,8 +25,8 @@ use super::system::*;
 use self::glutin::event::*;
 use self::glutin::platform::desktop::EventLoopExtDesktop;
 use mecs::render_pipeline::DefaultPipeline;
-use mecs::RenderPipeline;
 use mecs::SystemSet;
+use mecs::{Component, Entity, RenderPipeline};
 
 pub struct World {
     static_world: StaticWorld,
@@ -52,17 +52,47 @@ impl Default for World {
     }
 }
 
-fn clone_window_event(event: &GlutinWindowEvent<'static>) -> GlutinWindowEvent<'static> {
-    let mut cloned = GlutinWindowEvent::<'static>::CloseRequested;
-    unsafe {
-        std::ptr::copy_nonoverlapping(event, &mut cloned, 1);
-    }
-    cloned
-}
-
 impl World {
     pub fn default_update_interval() -> Duration {
         Duration::from_millis(30)
+    }
+    pub fn entity(&mut self) -> Entity {
+        self.as_static_mut().entity()
+    }
+    pub fn delete_entity(&mut self, entity: Entity) {
+        self.as_static_mut().delete_entity(entity);
+    }
+
+    pub fn component<C>(&self, entity: Entity) -> Option<&C>
+    where
+        C: Component,
+    {
+        self.as_static().component::<C>(entity)
+    }
+
+    pub fn component_mut<C>(&mut self, entity: Entity) -> Option<&mut C>
+    where
+        C: Component,
+    {
+        self.as_static_mut().component_mut::<C>(entity)
+    }
+    pub fn add_component<C>(&mut self, entity: Entity, component: C)
+    where
+        C: Component,
+    {
+        self.as_static_mut().add_component(entity, component);
+    }
+    pub fn entities_with_component<C>(&self) -> Vec<(Entity, &C)>
+    where
+        C: Component,
+    {
+        self.as_static().entities_with_component::<C>()
+    }
+    pub fn entities_with_component_mut<C>(&mut self) -> Vec<(Entity, &mut C)>
+    where
+        C: Component,
+    {
+        self.as_static_mut().entities_with_component_mut::<C>()
     }
 
     pub fn new() -> World {
@@ -173,10 +203,19 @@ impl World {
                     if msg.payload.is::<message::Exit>() {
                         self.running = false;
                     } else {
-                        eprintln!("Root got message {:?}", msg.payload);
+                        if let Some(Update(dt)) = msg.payload.downcast_ref() {
+                            self.update_systems(*dt);
+                        } else {
+                            eprintln!("Root got message {:?}", msg.payload);
+                        }
                     }
                 }
             }
+        }
+    }
+    fn update_systems(&mut self, delta_time: Duration) {
+        for (_id, system) in self.systems.all_systems_mut() {
+            system.update(delta_time, &mut self.static_world);
         }
     }
     pub fn channel(&mut self) -> MessageChannel {
@@ -224,7 +263,7 @@ impl World {
             let mut sleep_until = Instant::now() + update_interval;
 
             while updates_running.load(Ordering::Relaxed) {
-                if let Err(_) = sender.broadcast(message::Update(update_interval)) {
+                if let Err(_) = sender.send_to_root(Update(update_interval)) {
                     break;
                 };
                 thread::sleep(sleep_until - Instant::now());
@@ -254,11 +293,6 @@ impl World {
             updates_running.store(false, Ordering::Relaxed);
         }
     }
-    fn send_to_ui_aware(&mut self, event: UiEvent) {
-        for id in &self.ui_aware_systems {
-            self.static_world.send(*id, event.clone());
-        }
-    }
     fn glutin_update_control(
         &mut self,
         event: &Event<AnnotatedMessage>,
@@ -273,9 +307,7 @@ impl World {
                 requested_resume, ..
             }) => {
                 *control_flow = GlutinControlFlow::WaitUntil(*requested_resume + update_interval);
-                self.static_world
-                    .broadcast(message::Update(update_interval));
-                self.deliver_all_messages();
+                self.update_systems(update_interval);
                 return true;
             }
             _ => {}
@@ -300,7 +332,6 @@ impl World {
                         self.static_world.send_annotated(msg);
                     }
                     Event::MainEventsCleared => {
-                        self.send_to_ui_aware(UiEvent::EventsCleared);
                         self.deliver_all_messages();
                     }
                     _ => (),
@@ -332,26 +363,36 @@ impl World {
                         self.glutin_window_event(&event);
                         win.window().request_redraw();
 
-                        if let Some(static_event) = event.to_static() {
-                            self.send_to_ui_aware(UiEvent::WindowEvent(static_event));
-                            self.deliver_all_messages();
+                        for id in &self.ui_aware_systems {
+                            self.systems
+                                .system_boxed_mut(*id)
+                                .unwrap()
+                                .window_event(&event, &mut self.static_world);
                         }
+
+                        self.deliver_all_messages();
                     }
                     Event::DeviceEvent { event, .. } => {
-                        self.send_to_ui_aware(UiEvent::DeviceEvent(event));
+                        for id in &self.ui_aware_systems {
+                            self.systems
+                                .system_boxed_mut(*id)
+                                .unwrap()
+                                .device_event(&event, &mut self.static_world);
+                        }
                         self.deliver_all_messages();
                     }
                     Event::RedrawRequested(..) => {
-                        self.render_pipeline
-                            .render(&mut self.static_world, &self.ui_aware_systems);
-                        self.deliver_all_messages(); // FIXME: don't deliver all all the time
+                        self.render_pipeline.render(
+                            &mut self.static_world,
+                            &mut self.systems,
+                            &self.ui_aware_systems,
+                        );
                         win.swap_buffers().unwrap();
                     }
                     Event::UserEvent(msg) => {
                         self.static_world.send_annotated(msg);
                     }
                     Event::MainEventsCleared => {
-                        self.send_to_ui_aware(UiEvent::EventsCleared);
                         self.deliver_all_messages();
                     }
                     _ => (),
@@ -386,22 +427,5 @@ impl World {
 }
 
 #[derive(Debug)]
-pub enum UiEvent {
-    DeviceEvent(GlutinDeviceEvent),
-    WindowEvent(GlutinWindowEvent<'static>),
-    Redraw,
-    EventsCleared,
-}
-
-impl Clone for UiEvent {
-    fn clone(&self) -> Self {
-        match self {
-            UiEvent::DeviceEvent(ev) => UiEvent::DeviceEvent(ev.clone()),
-            UiEvent::WindowEvent(ev) => UiEvent::WindowEvent(clone_window_event(ev)),
-            UiEvent::Redraw => UiEvent::Redraw,
-            UiEvent::EventsCleared => UiEvent::EventsCleared,
-        }
-    }
-}
-
-impl Message for UiEvent {}
+struct Update(pub Duration);
+impl Message for Update {}

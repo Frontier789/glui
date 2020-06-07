@@ -69,8 +69,14 @@ impl GuiBuilder for Data {
             };
 
             -GridLayout {
-                col_widths: vec![1.0; 5],
-                row_heights: vec![1.0; 5],
+                col_widths: vec![
+                    GuiDimension::Relative(1.0),
+                    GuiDimension::Units(130.0),
+                    GuiDimension::Relative(1.0),
+                    GuiDimension::Units(130.0),
+                    GuiDimension::Relative(1.0),
+                ],
+                row_heights: vec![GuiDimension::Default; 5],
                 ..Default::default()
             } << {
                 for i in 0..20 {

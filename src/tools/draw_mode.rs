@@ -1,7 +1,7 @@
 use super::gl::types::*;
 use std::fmt;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum DrawMode {
     Points,
     LineStrip,

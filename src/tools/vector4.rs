@@ -2,6 +2,7 @@ extern crate num;
 
 use super::vector3::Vec3;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
+use tools::Vec2;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Vec4 {
@@ -44,6 +45,14 @@ impl Vec4 {
             y: xyz.y,
             z: xyz.z,
             w,
+        }
+    }
+    pub fn from_vec2s(xy: Vec2, zw: Vec2) -> Vec4 {
+        Vec4 {
+            x: xy.x,
+            y: xy.y,
+            z: zw.x,
+            w: zw.y,
         }
     }
 

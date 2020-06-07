@@ -3,7 +3,6 @@ use std::path::Path;
 
 use graphics::*;
 use gui::{GenericCallbackExecutor, GuiBuilder, PostBox, WidgetParser};
-use mecs::world::UiEvent;
 use mecs::*;
 use tools::*;
 
@@ -34,6 +33,7 @@ where
     cursor_pos: Vec2,
     render_seq: Option<RenderSequence>,
     render_dirty: bool,
+    build_dirty: bool,
     profiler: Profiler,
     gui_builder: D,
     cb_executor: GenericCallbackExecutor<D>,
@@ -43,26 +43,50 @@ impl<D> System for GuiContext<D>
 where
     D: GuiBuilder + 'static,
 {
-    fn receive(&mut self, msg: &Box<dyn Message>, world: &mut StaticWorld) {
-        // println!("context got: {:?}",_msg);
-        let dc: Option<&UiEvent> = msg.downcast_ref::<UiEvent>();
-        if let Some(ui_event) = dc {
-            match ui_event {
-                UiEvent::WindowEvent(ev) => {
-                    self.translate_event(ev);
-                }
-                UiEvent::Redraw => {
-                    self.render();
-                }
-                UiEvent::EventsCleared => {
-                    self.actualize_data();
+    fn render(&mut self, _world: &mut StaticWorld) {
+        self.actualize_data(); // FIXME: actualize after events only
 
-                    for message in self.cb_executor.sender.drain_messages() {
-                        world.send_annotated(message);
+        crate::tools::gltraits::check_glerr_debug();
+        let rseq = self.render_seq.as_mut().unwrap();
+
+        self.profiler.begin_gpu("Draw");
+        rseq.execute(&mut self.draw_res);
+        self.profiler.end_gpu();
+    }
+
+    fn window_event(&mut self, event: &GlutinWindowEvent, world: &mut StaticWorld) {
+        match event {
+            GlutinWindowEvent::Resized(size) => {
+                self.resized(size.into());
+            }
+            GlutinWindowEvent::KeyboardInput { input, .. } => match input.virtual_keycode {
+                None => (),
+                Some(key) => {
+                    if input.state == glutin::event::ElementState::Pressed {
+                        self.key_pressed(key);
+                    } else {
+                        self.key_released(key);
                     }
                 }
-                _ => {}
+            },
+            GlutinWindowEvent::MouseInput { button, state, .. } => {
+                if *state == glutin::event::ElementState::Pressed {
+                    self.button_pressed(*button);
+                } else {
+                    self.button_released(*button);
+                }
             }
+            GlutinWindowEvent::CursorMoved { position, .. } => {
+                self.cursor_moved(position.into());
+            }
+            GlutinWindowEvent::CursorLeft { .. } => {
+                self.cursor_left();
+            }
+            _ => (),
+        }
+
+        for message in self.cb_executor.sender.drain_messages() {
+            world.send_annotated(message);
         }
     }
 }
@@ -72,7 +96,7 @@ where
     D: GuiBuilder + 'static,
 {
     pub fn new(target: WindowInfo, profile: bool, gui_builder: D) -> GuiContext<D> {
-        GuiContext {
+        let mut gui_context = GuiContext {
             widgets: vec![],
             parents: vec![],
             widget_graph: vec![],
@@ -84,6 +108,7 @@ where
             cursor_pos: Vec2::new(-1.0, -1.0),
             render_seq: None,
             render_dirty: true,
+            build_dirty: true,
             draw_res: DrawResources::new(target).unwrap(),
             profiler: Profiler::new(profile),
             cb_executor: GenericCallbackExecutor {
@@ -91,7 +116,9 @@ where
                 sender: PostBox::new(),
             },
             gui_builder,
-        }
+        };
+        gui_context.rebuild_gui();
+        gui_context
     }
     fn rebuild_render_seq(&mut self) {
         self.profiler.begin("Rebuild_Render");
@@ -120,6 +147,7 @@ where
             widget_list.widget_graph,
         );
         layout_builder.build(self.draw_res.window_info.logical_size());
+        self.build_dirty = false;
         self.cursor_hierarchy = None;
         self.active_widget = None;
         self.widget_graph = layout_builder.widget_graph;
@@ -137,6 +165,18 @@ where
     pub fn widget_count(&self) -> usize {
         self.widgets.len()
     }
+    fn handle_event_response(&mut self, response: EventResponse) {
+        match response {
+            EventResponse::HandledRedraw => {
+                self.render_dirty = true;
+            }
+            EventResponse::HandledRebuild => {
+                self.build_dirty = true;
+            }
+            EventResponse::Handled => {}
+            EventResponse::Pass => {}
+        }
+    }
     pub fn button_released(&mut self, button: GlutinButton) {
         if button != GlutinButton::Left {
             return;
@@ -146,11 +186,8 @@ where
                 self.rebuild_cursor_inside(self.cursor_pos);
             }
             (Some(id), GrabState::GrabbedInside) => {
-                if self.widgets[id].on_release((&mut self.cb_executor).into())
-                    == EventResponse::HandledRedraw
-                {
-                    self.render_dirty = true;
-                }
+                let response = self.widgets[id].on_release((&mut self.cb_executor).into());
+                self.handle_event_response(response);
             }
             _ => {}
         }
@@ -196,18 +233,16 @@ where
         Rect::from_pos_size(pos, siz).contains(p)
     }
     fn fire_enter_event(&mut self, id: usize) {
-        if self.widgets[id].on_cursor_enter((&mut self.cb_executor).into())
-            == EventResponse::HandledRedraw
-        {
-            self.render_dirty = true;
-        }
+        let response = self.widgets[id].on_cursor_enter((&mut self.cb_executor).into());
+        self.handle_event_response(response);
     }
     fn fire_leave_event(&mut self, id: usize) {
-        if self.widgets[id].on_cursor_leave((&mut self.cb_executor).into())
-            == EventResponse::HandledRedraw
-        {
-            self.render_dirty = true;
-        }
+        let response = self.widgets[id].on_cursor_leave((&mut self.cb_executor).into());
+        self.handle_event_response(response);
+    }
+    fn fire_move_event(&mut self, id: usize, pos: Vec2) {
+        let response = self.widgets[id].on_cursor_move(pos, (&mut self.cb_executor).into());
+        self.handle_event_response(response);
     }
     pub fn cursor_moved(&mut self, p: Vec2) {
         self.cursor_pos = p;
@@ -234,6 +269,9 @@ where
             }
         };
         self.cursor_grabbed = grab;
+        if let Some(i) = self.cursor_hierarchy {
+            self.fire_move_event(i, p);
+        }
     }
     fn pop_cursor_hierarchy(&mut self) {
         if let Some(i) = self.cursor_hierarchy {
@@ -275,52 +313,15 @@ where
             self.complete_cursor_inside(i, p);
         }
     }
+
     pub fn set_profile(&mut self, enabled: bool) {
         self.profiler.set_enabled(enabled);
     }
-    fn render(&mut self) {
-        crate::tools::gltraits::check_glerr_debug();
-        let rseq = self.render_seq.as_mut().unwrap();
 
-        self.profiler.begin_gpu("Draw");
-        rseq.execute(&mut self.draw_res);
-        self.profiler.end_gpu();
-    }
-    fn translate_event(&mut self, event: &GlutinWindowEvent<'static>) {
-        match event {
-            GlutinWindowEvent::Resized(size) => {
-                self.resized(size.into());
-            }
-            GlutinWindowEvent::KeyboardInput { input, .. } => match input.virtual_keycode {
-                None => (),
-                Some(key) => {
-                    if input.state == glutin::event::ElementState::Pressed {
-                        self.key_pressed(key);
-                    } else {
-                        self.key_released(key);
-                    }
-                }
-            },
-            GlutinWindowEvent::MouseInput { button, state, .. } => {
-                if *state == glutin::event::ElementState::Pressed {
-                    self.button_pressed(*button);
-                } else {
-                    self.button_released(*button);
-                }
-            }
-            GlutinWindowEvent::CursorMoved { position, .. } => {
-                self.cursor_moved(position.into());
-            }
-            GlutinWindowEvent::CursorLeft { .. } => {
-                self.cursor_left();
-            }
-            _ => (),
-        }
-    }
     fn actualize_data(&mut self) {
         let builder = &self.cb_executor.gui_builder;
 
-        if self.gui_builder != *builder {
+        if self.gui_builder != *builder || self.build_dirty {
             self.gui_builder = builder.clone();
             self.rebuild_gui();
             self.rebuild_cursor_inside(self.cursor_pos);

@@ -27,6 +27,7 @@ where
         gl::ClearColor(bgcolor.x, bgcolor.y, bgcolor.z, 1.0);
         gl::Clear(gl::COLOR_BUFFER_BIT);
         gl::Enable(gl::DEPTH_TEST);
+        gl::Enable(gl::PRIMITIVE_RESTART_FIXED_INDEX);
         gl::DepthFunc(gl::LEQUAL);
     }
 }

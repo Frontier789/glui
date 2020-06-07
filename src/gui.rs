@@ -14,6 +14,7 @@ pub use self::elements::FixedPanel;
 pub use self::elements::FontSize;
 pub use self::elements::GridLayout;
 pub use self::elements::Image;
+pub use self::elements::Lines;
 pub use self::elements::Overlay;
 pub use self::elements::Padding;
 pub use self::elements::PanelDirection;

@@ -22,12 +22,28 @@ impl Default for GuiDimension {
 }
 
 impl GuiDimension {
-    pub fn to_units(&self, container_dimension: f32) -> f32 {
-        match *self {
+    pub fn to_units(self, container_dimension: f32) -> f32 {
+        match self {
             GuiDimension::Units(s) => s,
             GuiDimension::Relative(r) => container_dimension * r,
             _ => container_dimension,
         }
+    }
+    pub fn relative(self) -> f32 {
+        match self {
+            GuiDimension::Units(_) => 0.0,
+            GuiDimension::Relative(r) => r,
+            GuiDimension::Default => 1.0,
+        }
+    }
+    pub fn absolute(self) -> f32 {
+        match self {
+            GuiDimension::Units(s) => s,
+            _ => 0.0,
+        }
+    }
+    pub fn relative_array(array: Vec<f32>) -> Vec<GuiDimension> {
+        array.iter().map(|f| GuiDimension::Relative(*f)).collect()
     }
 }
 
@@ -36,6 +52,8 @@ pub struct WidgetSize {
     pub x: GuiDimension,
     pub y: GuiDimension,
 }
+
+pub type GuiPoint = WidgetSize;
 
 impl Default for WidgetSize {
     fn default() -> WidgetSize {
@@ -87,11 +105,12 @@ pub struct WidgetConstraints {
     pub max_size: Vec2px,
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum EventResponse {
     Pass,
     Handled,
     HandledRedraw,
+    HandledRebuild,
 }
 
 #[derive(Default, Debug, Copy, Clone)]
@@ -141,6 +160,13 @@ pub trait Widget: Downcast {
         EventResponse::Pass
     }
     fn on_cursor_leave(&mut self, _executor: CallbackExecutor) -> EventResponse {
+        EventResponse::Pass
+    }
+    fn on_cursor_move(
+        &mut self,
+        _cursor_position: Vec2,
+        _executor: CallbackExecutor,
+    ) -> EventResponse {
         EventResponse::Pass
     }
     fn on_draw_build(&self, _builder: &mut DrawBuilder) {}
