@@ -2,6 +2,8 @@ use super::bimap::BiMap;
 use super::component::*;
 use super::message::*;
 use mecs::entity::Entity;
+use mecs::System;
+use std::any::TypeId;
 use std::collections::HashMap;
 
 #[derive(Default)]
@@ -143,6 +145,21 @@ impl StaticWorld {
         M: Message,
     {
         self.send_annotated((target, msg).into());
+    }
+
+    pub fn send_root<M>(&mut self, msg: M)
+    where
+        M: Message,
+    {
+        self.send_annotated((MessageTarget::Root, msg).into());
+    }
+
+    pub fn send_by_type<S, M>(&mut self, msg: M)
+    where
+        S: System,
+        M: Message,
+    {
+        self.send_annotated((MessageTarget::SystemOfType(TypeId::of::<S>()), msg).into());
     }
 
     pub fn send_annotated(&mut self, msg: AnnotatedMessage) {

@@ -41,11 +41,11 @@ impl Camera {
     pub fn update(&mut self, delta: Duration) {
         self.controller.update(&mut self.params, delta);
     }
-    pub fn on_window_event(&mut self, event: &GlutinWindowEvent) {
-        self.controller.on_window_event(&mut self.params, event);
+    pub fn on_window_event(&mut self, event: &GlutinWindowEvent) -> bool {
+        self.controller.on_window_event(&mut self.params, event)
     }
-    pub fn on_device_event(&mut self, event: &GlutinDeviceEvent) {
-        self.controller.on_device_event(&mut self.params, event);
+    pub fn on_device_event(&mut self, event: &GlutinDeviceEvent) -> bool {
+        self.controller.on_device_event(&mut self.params, event)
     }
     pub fn new<C>(controller: C) -> Camera
     where

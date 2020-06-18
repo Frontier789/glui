@@ -1,3 +1,4 @@
+use std::f32::consts::PI;
 use tools::{Mat4, Vec3, Vec4};
 
 #[derive(Debug, Copy, Clone)]
@@ -31,10 +32,13 @@ impl CameraSpatialParams {
         self.v().cross(self.up).sgn()
     }
     pub fn u(&self) -> Vec3 {
-        self.r().cross(self.v()).sgn()
+        self.up
     }
     pub fn v(&self) -> Vec3 {
         (self.target - self.pos).sgn()
+    }
+    pub fn f(&self) -> Vec3 {
+        self.v().proj_to_perp(Vec3::new(0.0, 1.0, 0.0))
     }
     pub fn pos_to_target(&self) -> Vec3 {
         self.target - self.pos
@@ -73,6 +77,24 @@ impl CameraSpatialParams {
 
         self.up = up;
         self.pos = self.target + d;
+    }
+    pub fn pitch(&self) -> f32 {
+        let v = self.v();
+        v.y.asin()
+    }
+    pub fn yaw(&self) -> f32 {
+        let f = self.f().sgn();
+        (-f.z).acos() * f.x.signum()
+    }
+    pub fn roll(&self) -> f32 {
+        let r = Vec3::new(0.0, 1.0, 0.0).cross(self.v()).sgn();
+
+        let u = r.cross(-self.v()).sgn();
+
+        u.dot(self.up).min(1.0).max(-1.0).acos() * r.dot(self.up).signum()
+    }
+    pub fn add_roll(&mut self, diff: f32) {
+        self.up = (Mat4::rotate(self.v(), diff) * Vec4::from_vec3(self.up, 0.0)).xyz()
     }
     pub fn view_mat(&self) -> Mat4 {
         Mat4::from_base(self.r(), self.u(), -self.v()).transpose() * Mat4::offset(-self.pos)

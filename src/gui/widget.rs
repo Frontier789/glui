@@ -140,9 +140,6 @@ impl WidgetPosition {
 pub trait Widget: Downcast {
     fn constraint(&mut self, _self_constraint: WidgetConstraints) {}
 
-    fn expand(&self) -> Vec<Box<dyn Widget>> {
-        vec![]
-    }
     fn place_child(&mut self, _child_size: Vec2px, _child_descent: f32) -> WidgetPosition {
         Vec2px::zero().into()
     }
@@ -150,22 +147,26 @@ pub trait Widget: Downcast {
         None
     }
 
-    fn on_press(&mut self, _executor: CallbackExecutor) -> EventResponse {
+    fn on_press(
+        &mut self,
+        _local_cursor_pos: Vec2px,
+        _executor: &mut CallbackExecutor,
+    ) -> EventResponse {
         EventResponse::Pass
     }
-    fn on_release(&mut self, _executor: CallbackExecutor) -> EventResponse {
+    fn on_release(&mut self, _executor: &mut CallbackExecutor) -> EventResponse {
         EventResponse::Pass
     }
-    fn on_cursor_enter(&mut self, _executor: CallbackExecutor) -> EventResponse {
+    fn on_cursor_enter(&mut self, _executor: &mut CallbackExecutor) -> EventResponse {
         EventResponse::Pass
     }
-    fn on_cursor_leave(&mut self, _executor: CallbackExecutor) -> EventResponse {
+    fn on_cursor_leave(&mut self, _executor: &mut CallbackExecutor) -> EventResponse {
         EventResponse::Pass
     }
     fn on_cursor_move(
         &mut self,
-        _cursor_position: Vec2,
-        _executor: CallbackExecutor,
+        _local_cursor_pos: Vec2px,
+        _executor: &mut CallbackExecutor,
     ) -> EventResponse {
         EventResponse::Pass
     }
@@ -178,5 +179,17 @@ impl_downcast!(Widget);
 impl Widget for () {
     fn size(&self) -> Vec2px {
         Vec2px::zero()
+    }
+}
+
+trait WidgetClone {
+    fn clone_widget(&self) -> Box<dyn Widget + 'static>;
+}
+impl<T> WidgetClone for T
+where
+    T: Widget + Clone,
+{
+    fn clone_widget(&self) -> Box<dyn Widget + 'static> {
+        Box::new(self.clone())
     }
 }

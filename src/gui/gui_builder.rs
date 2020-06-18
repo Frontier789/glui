@@ -1,8 +1,12 @@
 use gui::widget_parser::StoredCallback;
-use gui::{GuiCallback, PostBox, Widget, WidgetParser};
+use gui::GuiCallback;
+use gui::Widget;
+use gui::WidgetParser;
+use mecs::{Message, StaticWorld};
 use std::any::Any;
 use std::fmt::Debug;
 use std::ops::Shl;
+use std::time::Duration;
 
 #[macro_export]
 macro_rules! impl_widget_building_for {
@@ -64,16 +68,16 @@ impl Shl<WidgetAdder> for WidgetAdder {
 pub trait GuiBuilder: Clone + PartialEq + Debug {
     fn make_callback3<F, S>(&self, f: F) -> GuiCallback<S>
     where
-        F: 'static + Fn(&mut Self, &S, &mut PostBox),
+        F: 'static + Fn(&mut Self, &S, &mut StaticWorld),
         S: Widget + 'static,
         Self: Sized + 'static,
     {
         WidgetParser::add_callback(StoredCallback::ThreeParams(Box::new(
-            move |input: &mut dyn Any, instance: &dyn Any, post: &mut PostBox| {
+            move |input: &mut dyn Any, instance: &dyn Any, world: &mut StaticWorld| {
                 f(
                     input.downcast_mut().unwrap(),
                     instance.downcast_ref().unwrap(),
-                    post,
+                    world,
                 );
             },
         )))
@@ -116,4 +120,7 @@ pub trait GuiBuilder: Clone + PartialEq + Debug {
     }
 
     fn build(&self);
+
+    fn receive(&mut self, _msg: &Box<dyn Message>, _world: &mut StaticWorld) {}
+    fn update(&mut self, _delta_time: Duration, _world: &mut StaticWorld) {}
 }

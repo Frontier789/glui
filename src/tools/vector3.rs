@@ -60,6 +60,10 @@ impl Vec3 {
         }
     }
 
+    pub fn proj_to_perp(self, n: Vec3) -> Vec3 {
+        self - n * self.dot(n)
+    }
+
     pub fn length(&self) -> f32 {
         Float::sqrt(self.x * self.x + self.y * self.y + self.z * self.z)
     }

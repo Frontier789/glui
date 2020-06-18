@@ -111,6 +111,24 @@ impl Rect {
         ]
     }
 
+    pub fn corners(self) -> Vec<Vec2> {
+        vec![
+            Vec2::new(self.left, self.top),
+            Vec2::new(self.right, self.top),
+            Vec2::new(self.right, self.bottom),
+            Vec2::new(self.left, self.bottom),
+        ]
+    }
+
+    pub fn corners_3d(self) -> Vec<Vec3> {
+        vec![
+            Vec3::new(self.left, self.top, 0.0),
+            Vec3::new(self.right, self.top, 0.0),
+            Vec3::new(self.right, self.bottom, 0.0),
+            Vec3::new(self.left, self.bottom, 0.0),
+        ]
+    }
+
     pub fn contains(&self, p: Vec2) -> bool {
         self.left <= p.x && self.right >= p.x && self.top <= p.y && self.bottom >= p.y
     }

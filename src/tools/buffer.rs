@@ -23,12 +23,17 @@ impl<T: GlNum> Buffer<T> {
             _data_type: PhantomData,
         }
     }
-    pub fn from_vec(v: Vec<T>) -> Buffer<T> {
+    pub fn from_vec(v: &Vec<T>) -> Buffer<T> {
         let mut buf = Buffer::<T>::new();
         buf.set_data_reinterpret(v);
         buf
     }
-    pub fn from_base_vec(v: Vec<T::BaseType>) -> Buffer<T> {
+    pub fn from_vec_reinterpret<Q>(v: &Vec<Q>) -> Buffer<T> {
+        let mut buf = Buffer::<T>::new();
+        buf.set_data_reinterpret(v);
+        buf
+    }
+    pub fn from_base_vec(v: &Vec<T::BaseType>) -> Buffer<T> {
         let mut buf = Buffer::<T>::new();
         buf.set_data_reinterpret(v);
         buf
@@ -37,11 +42,11 @@ impl<T: GlNum> Buffer<T> {
         self.size
     }
 
-    pub fn set_data(&mut self, v: Vec<T>) {
+    pub fn set_data(&mut self, v: &Vec<T>) {
         self.set_data_reinterpret(v)
     }
 
-    pub fn set_data_reinterpret<Q>(&mut self, v: Vec<Q>) {
+    pub fn set_data_reinterpret<Q>(&mut self, v: &Vec<Q>) {
         let size = std::mem::size_of::<Q>() * v.len();
         let ptr = v.as_ptr() as *const c_void;
         unsafe {
@@ -50,7 +55,7 @@ impl<T: GlNum> Buffer<T> {
         self.size = size / std::mem::size_of::<T>();
     }
 
-    pub fn update(&mut self, v: Vec<T>, offset: usize) {
+    pub fn update(&mut self, v: &Vec<T>, offset: usize) {
         if offset >= self.size {
             return ();
         }

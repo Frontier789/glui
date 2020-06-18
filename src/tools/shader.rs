@@ -221,6 +221,9 @@ impl DrawShader {
             Uniform::Vector2(id, value) => {
                 self.set_uniform(&id, value);
             }
+            Uniform::Vector3(id, value) => {
+                self.set_uniform(&id, value);
+            }
             Uniform::Vector4(id, value) => {
                 self.set_uniform(&id, value);
             }
@@ -265,6 +268,13 @@ impl DrawShader {
             gl::ActiveTexture(gl::TEXTURE0 + slot);
             gl::BindTexture(target, id);
         }
+    }
+
+    pub fn from_files(vert: &str, frag: &str) -> Result<DrawShader, ShaderLoadError> {
+        let vert_source = std::fs::read_to_string(vert)?;
+        let frag_source = std::fs::read_to_string(frag)?;
+
+        Ok(Self::compile(&vert_source, &frag_source)?)
     }
 }
 

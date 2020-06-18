@@ -25,6 +25,30 @@ impl Align {
             vertical,
         }
     }
+    pub fn left() -> Align {
+        Align {
+            horizontal: HAlign::Left,
+            vertical: VAlign::Center,
+        }
+    }
+    pub fn right() -> Align {
+        Align {
+            horizontal: HAlign::Right,
+            vertical: VAlign::Center,
+        }
+    }
+    pub fn top() -> Align {
+        Align {
+            horizontal: HAlign::Center,
+            vertical: VAlign::Top,
+        }
+    }
+    pub fn bottom() -> Align {
+        Align {
+            horizontal: HAlign::Center,
+            vertical: VAlign::Bottom,
+        }
+    }
 }
 
 impl Default for Align {

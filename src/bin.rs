@@ -48,6 +48,7 @@ struct Data {
     goat: i32,
     shown: String,
     show_red: bool,
+    x: f32,
 }
 
 #[allow(unused_must_use)]
@@ -79,7 +80,9 @@ impl GuiBuilder for Data {
                 row_heights: vec![GuiDimension::Default; 5],
                 ..Default::default()
             } << {
-                for i in 0..20 {
+                let text = format!("{}", self.x);
+                self.mybutton(text, false);
+                for i in 1..20 {
                     let text = format!("{}", i + self.goat);
                     self.mybutton(text, i == 13);
                 }
@@ -92,6 +95,11 @@ impl GuiBuilder for Data {
                     }),
                     ..Default::default()
                 };
+                -LinearBar {
+                    value: self.x,
+                    callback: self.make_callback2(|data, bar: &LinearBar| data.x = bar.value),
+                    ..Default::default()
+                }
             };
         };
     }
@@ -128,18 +136,12 @@ impl Data {
 fn main() {
     let mut w: World = World::new_win(Vec2::new(640.0, 480.0), "", Vec3::grey(0.04));
 
-    let mut gui = GuiContext::new(
-        w.window_info().unwrap(),
-        true,
-        Data {
-            goat: 0,
-            shown: "hy ".to_owned(),
-            show_red: true,
-        },
-    );
-    gui.rebuild_gui();
-    let id = w.add_system(gui);
-    w.make_system_ui_aware(id);
+    w.add_gui(Data {
+        x: 0.1,
+        goat: 0,
+        shown: "hy ".to_owned(),
+        show_red: true,
+    });
     w.run();
 }
 

@@ -216,8 +216,8 @@ impl<'a> DrawBuilder<'a> {
             .flatten()
             .collect();
 
-        let pbuf = Buffer::from_vec(pts);
-        let cbuf = Buffer::from_vec(clr);
+        let pbuf = Buffer::from_vec(&pts);
+        let cbuf = Buffer::from_vec(&clr);
         let mut vao = VertexArray::new();
         vao.attrib_buffer(0, &pbuf);
         vao.attrib_buffer(1, &cbuf);
@@ -242,7 +242,7 @@ impl<'a> DrawBuilder<'a> {
                 .map(|o| o.tpt.clone().unwrap())
                 .flatten()
                 .collect();
-            let tbuf = Buffer::from_vec(tpt);
+            let tbuf = Buffer::from_vec(&tpt);
             vao.attrib_buffer(2, &tbuf);
             shader = DrawShaderSelector::DefaultTextured;
             render_seq.add_buffer(tbuf.into_base_type());

@@ -32,21 +32,14 @@ impl WidgetList {
             }
         }
     }
-    fn parse_push_children(&mut self, w: Box<dyn Widget>) {
-        let children = w.expand();
-        self.widgets.push(w);
-        for c in children {
-            self.parse_push_widget(c);
-            self.parse_pop();
-        }
-    }
     pub fn parse_push_widget(&mut self, w: Box<dyn Widget>) {
         let id = self.widgets.len();
         self.update_graph(id);
 
         self.id_stack.push(id);
         self.widget_depth.push(self.id_stack.len() - 1);
-        self.parse_push_children(w);
+
+        self.widgets.push(w);
     }
     pub fn parse_pop(&mut self) {
         let id = self.id_stack.pop().unwrap();

@@ -8,6 +8,11 @@ pub type GlutinDeviceEvent = glutin::event::DeviceEvent;
 pub type GlutinScrollDelta = glutin::event::MouseScrollDelta;
 pub type GlutinElementState = glutin::event::ElementState;
 
+pub enum GlutinEvent<'a> {
+    WindowEvent(GlutinWindowEvent<'a>),
+    DeviceEvent(GlutinDeviceEvent),
+}
+
 pub(super) type GlutinGLContext = glutin::Context<glutin::PossiblyCurrent>;
 pub(super) type GlutinControlFlow = glutin::event_loop::ControlFlow;
 pub(super) type GlutinGLContextNC = glutin::Context<glutin::NotCurrent>;

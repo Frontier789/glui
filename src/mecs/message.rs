@@ -2,6 +2,7 @@ extern crate downcast_rs;
 use self::downcast_rs::impl_downcast;
 use self::downcast_rs::Downcast;
 use super::system::*;
+use std::any::TypeId;
 use std::fmt::Debug;
 
 pub trait Message: Downcast + Debug + Send {}
@@ -29,6 +30,7 @@ where
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub enum MessageTarget {
     Broadcast,
+    SystemOfType(TypeId),
     System(SystemId),
     Root,
 }

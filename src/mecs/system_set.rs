@@ -40,6 +40,12 @@ impl SystemSet {
             .map(|systems| systems.get_mut(&id))
             .flatten()
     }
+    pub fn first_of_type_mut(&mut self, sys_type: TypeId) -> Option<&mut Box<dyn System>> {
+        let syses = self.systems_of_type.get_mut(&sys_type);
+        syses
+            .map(|s| s.iter_mut().next().map(|(_key, sys)| sys))
+            .flatten()
+    }
     fn systems_of_type_mut<S>(&mut self) -> &mut HashMap<SystemId, Box<dyn System>>
     where
         S: System,

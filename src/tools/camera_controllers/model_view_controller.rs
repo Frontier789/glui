@@ -3,6 +3,7 @@ use mecs::{
     GlutinWindowEvent,
 };
 use std::collections::HashMap;
+use std::f32::consts::PI;
 use tools::{CameraController, CameraParameters, CameraSpatialParams, Vec2};
 
 #[derive(Debug)]
@@ -16,25 +17,27 @@ pub struct ModelViewController {
 }
 
 impl CameraController for ModelViewController {
-    fn on_window_event(&mut self, cam: &mut CameraParameters, event: &GlutinWindowEvent) {
+    fn on_window_event(&mut self, cam: &mut CameraParameters, event: &GlutinWindowEvent) -> bool {
         match event {
             GlutinWindowEvent::MouseInput { state, button, .. } => {
                 self.button_pressed
                     .insert(*button, *state == GlutinElementState::Pressed);
 
                 if *state == GlutinElementState::Released && *button == GlutinButton::Left {
+                    self.rotation_direction = None;
+
                     if self.is_key_pressed(GlutinKey::LAlt) {
                         self.real_spatial.snap_view(0.9);
                         cam.spatial = self.real_spatial;
+                        true
                     } else {
-                        // self.real_spatial.snap_view(0.99);
-                        // cam.spatial = self.real_spatial;
+                        false
                     }
-
-                    self.rotation_direction = None;
-                }
-                if *state == GlutinElementState::Pressed && *button == GlutinButton::Left {
+                } else if *state == GlutinElementState::Pressed && *button == GlutinButton::Left {
                     self.drag_offset = Vec2::zero();
+                    true
+                } else {
+                    false
                 }
             }
             GlutinWindowEvent::MouseWheel { delta, .. } => {
@@ -46,26 +49,38 @@ impl CameraController for ModelViewController {
                 }
 
                 cam.spatial = self.real_spatial;
+
+                true
             }
-            _ => {}
+            _ => false,
         }
     }
-    fn on_device_event(&mut self, cam: &mut CameraParameters, event: &GlutinDeviceEvent) {
+    fn on_device_event(&mut self, cam: &mut CameraParameters, event: &GlutinDeviceEvent) -> bool {
         match event {
             GlutinDeviceEvent::Key(input) => {
                 if let Some(keycode) = input.virtual_keycode {
-                    if keycode == GlutinKey::LAlt && input.state == GlutinElementState::Released {
-                        self.real_spatial.snap_view(0.9);
-                        cam.spatial = self.real_spatial;
-                    }
-
-                    if keycode == GlutinKey::LAlt && !self.is_key_pressed(GlutinKey::LAlt) {
-                        cam.spatial = self.real_spatial;
-                        cam.spatial.snap_view(0.9);
-                    }
-
                     self.key_pressed
                         .insert(keycode, input.state == GlutinElementState::Pressed);
+
+                    if keycode == GlutinKey::R && input.state == GlutinElementState::Pressed {
+                        self.real_spatial.add_roll(-self.real_spatial.roll());
+                        cam.spatial = self.real_spatial;
+                        true
+                    } else if keycode == GlutinKey::LAlt
+                        && input.state == GlutinElementState::Released
+                    {
+                        self.real_spatial.snap_view(0.9);
+                        cam.spatial = self.real_spatial;
+                        true
+                    } else if keycode == GlutinKey::LAlt && !self.is_key_pressed(GlutinKey::LAlt) {
+                        cam.spatial = self.real_spatial;
+                        cam.spatial.snap_view(0.9);
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
                 }
             }
             GlutinDeviceEvent::MouseMotion { delta } => {
@@ -117,8 +132,10 @@ impl CameraController for ModelViewController {
                 if self.is_key_pressed(GlutinKey::LAlt) {
                     cam.spatial.snap_view(0.9);
                 }
+
+                left || right
             }
-            _ => {}
+            _ => false,
         }
     }
     fn init(&self, cam: &mut CameraParameters) {

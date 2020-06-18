@@ -8,7 +8,7 @@ use super::align::*;
 use super::draw::*;
 use super::widget::*;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct SkipCell {}
 
 impl_widget_building_for!(SkipCell);
@@ -18,12 +18,12 @@ impl Widget for SkipCell {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct VertLayoutPriv {
     size: Vec2px,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct VertLayout {
     pub padding: Vec2px,
     pub private: VertLayoutPriv,
@@ -76,13 +76,13 @@ impl PanelDirection {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct PanelPrivate {
     total_size: Vec2px,
     child_id: u32,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct FixedPanel {
     pub dir: PanelDirection,
     pub size: GuiDimension,
@@ -150,7 +150,7 @@ impl FixedPanel {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct GridLayoutPrivate {
     real_size: Vec2px,
     child_id: usize,
@@ -159,7 +159,7 @@ pub struct GridLayoutPrivate {
     row_heights_unit: Vec<f32>,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct GridLayout {
     pub col_widths: Vec<GuiDimension>,
     pub row_heights: Vec<GuiDimension>,
@@ -183,11 +183,13 @@ impl Widget for GridLayout {
         let tot_rel_h: f32 = self.row_heights.iter().map(|d| d.relative()).sum();
         let tot_abs_h: f32 = self.row_heights.iter().map(|d| d.absolute()).sum();
         let unit_per_rel_w = if tot_rel_w == 0.0 {
+            self.private.real_size.x = tot_abs_w;
             1.0
         } else {
             (s.x - tot_abs_w) / tot_rel_w
         };
         let unit_per_rel_h = if tot_rel_h == 0.0 {
+            self.private.real_size.y = tot_abs_h;
             1.0
         } else {
             (s.y - tot_abs_h) / tot_rel_h
@@ -254,13 +256,13 @@ impl PaddingValue {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct PaddingPrivate {
     all_size: Vec2px,
     stacking_depth: f32,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Padding {
     pub left: PaddingValue,
     pub right: PaddingValue,
@@ -394,11 +396,12 @@ impl FontSize {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct TextPrivate {
     real_size: Vec2px,
 }
 
+#[derive(Clone)]
 pub struct Text {
     pub text: String,
     pub color: Vec4,
@@ -465,12 +468,13 @@ pub enum ButtonBckg {
     Cirlce(Vec4),
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct ButtonPrivate {
     state: ButtonState,
     real_size: Vec2px,
 }
 
+#[derive(Clone)]
 pub struct Button {
     pub size: WidgetSize,
     pub text: String,
@@ -502,34 +506,29 @@ impl Widget for Button {
     fn constraint(&mut self, self_constraint: WidgetConstraints) {
         self.private.real_size = self.size.to_units(self_constraint.max_size);
     }
-    fn expand(&self) -> Vec<Box<dyn Widget>> {
-        vec![Box::new(Text {
-            text: self.text.clone(),
-            color: self.text_color,
-            font: self.font.clone(),
-            font_size: self.font_size,
-            ..Default::default()
-        })]
-    }
     fn child_constraint(&self) -> Option<WidgetConstraints> {
         Some(WidgetConstraints {
             max_size: self.size(),
         })
     }
-    fn on_press(&mut self, _executor: CallbackExecutor) -> EventResponse {
+    fn on_press(
+        &mut self,
+        _local_cursor_pos: Vec2px,
+        _executor: &mut CallbackExecutor,
+    ) -> EventResponse {
         self.private.state = ButtonState::Pressed;
         EventResponse::HandledRedraw
     }
-    fn on_release(&mut self, mut executor: CallbackExecutor) -> EventResponse {
+    fn on_release(&mut self, executor: &mut CallbackExecutor) -> EventResponse {
         executor.execute(&self.callback, self);
         self.private.state = ButtonState::Hovered;
         EventResponse::HandledRedraw
     }
-    fn on_cursor_enter(&mut self, _executor: CallbackExecutor) -> EventResponse {
+    fn on_cursor_enter(&mut self, _executor: &mut CallbackExecutor) -> EventResponse {
         self.private.state = ButtonState::Hovered;
         EventResponse::HandledRedraw
     }
-    fn on_cursor_leave(&mut self, _executor: CallbackExecutor) -> EventResponse {
+    fn on_cursor_leave(&mut self, _executor: &mut CallbackExecutor) -> EventResponse {
         self.private.state = ButtonState::Normal;
         EventResponse::HandledRedraw
     }
@@ -539,6 +538,14 @@ impl Widget for Button {
             self.background.clone(),
             self.private.state,
             self.size(),
+        );
+        builder.add_text(
+            &self.text,
+            &self.font,
+            self.size(),
+            self.text_color,
+            Default::default(),
+            self.font_size.to_pixels(self.size().minxy(), 1.0),
         );
     }
     fn size(&self) -> Vec2px {
@@ -613,35 +620,30 @@ fn build_draw_for_button(
     }
 }
 
-#[derive(Default)]
-pub struct TogglePrivate {
+#[derive(Default, Copy, Clone)]
+pub struct LinearBarPrivate {
     state: ButtonState,
     real_size: Vec2px,
 }
 
-pub struct Toggle {
-    pub on: bool,
+#[derive(Clone)]
+pub struct LinearBar {
+    pub value: f32,
+    pub minimum: f32,
+    pub maximum: f32,
     pub size: WidgetSize,
-    pub on_text: String,
-    pub off_text: String,
-    pub text_color: Vec4,
-    pub font: String,
-    pub font_size: FontSize,
     pub background: ButtonBckg,
-    pub callback: GuiCallback<Toggle>,
-    pub private: TogglePrivate,
+    pub callback: GuiCallback<LinearBar>,
+    pub private: LinearBarPrivate,
 }
 
-impl Default for Toggle {
-    fn default() -> Toggle {
-        Toggle {
-            on: false,
+impl Default for LinearBar {
+    fn default() -> LinearBar {
+        LinearBar {
+            value: 0.5,
+            minimum: 0.0,
+            maximum: 1.0,
             size: Default::default(),
-            on_text: Default::default(),
-            off_text: Default::default(),
-            text_color: Vec4::WHITE,
-            font: "sans-serif".to_owned(),
-            font_size: Default::default(),
             background: ButtonBckg::Fill(Vec4::grey(0.1)),
             callback: Default::default(),
             private: Default::default(),
@@ -649,48 +651,61 @@ impl Default for Toggle {
     }
 }
 
-impl_widget_building_for!(Toggle);
-impl Widget for Toggle {
+impl_widget_building_for!(LinearBar);
+impl Widget for LinearBar {
     fn constraint(&mut self, self_constraint: WidgetConstraints) {
         self.private.real_size = self.size.to_units(self_constraint.max_size);
     }
-    fn on_press(&mut self, _executor: CallbackExecutor) -> EventResponse {
+    fn on_press(
+        &mut self,
+        local_cursor_pos: Vec2px,
+        executor: &mut CallbackExecutor,
+    ) -> EventResponse {
+        self.update_value(local_cursor_pos.x);
+        executor.execute(&self.callback, &self);
+
         self.private.state = ButtonState::Pressed;
         EventResponse::HandledRedraw
     }
-    fn on_release(&mut self, mut executor: CallbackExecutor) -> EventResponse {
-        self.on = !self.on;
-        executor.execute(&self.callback, self);
+    fn on_release(&mut self, _executor: &mut CallbackExecutor) -> EventResponse {
         self.private.state = ButtonState::Hovered;
         EventResponse::HandledRedraw
     }
-    fn on_cursor_enter(&mut self, _executor: CallbackExecutor) -> EventResponse {
+    fn on_cursor_enter(&mut self, _executor: &mut CallbackExecutor) -> EventResponse {
         self.private.state = ButtonState::Hovered;
         EventResponse::HandledRedraw
     }
-    fn on_cursor_leave(&mut self, _executor: CallbackExecutor) -> EventResponse {
+    fn on_cursor_leave(&mut self, _executor: &mut CallbackExecutor) -> EventResponse {
         self.private.state = ButtonState::Normal;
         EventResponse::HandledRedraw
+    }
+    fn on_cursor_move(
+        &mut self,
+        local_cursor_pos: Vec2px,
+        executor: &mut CallbackExecutor,
+    ) -> EventResponse {
+        match self.private.state {
+            ButtonState::Pressed => {
+                self.update_value(local_cursor_pos.x);
+                executor.execute(&self.callback, &self);
+
+                EventResponse::HandledRedraw
+            }
+            _ => EventResponse::Pass,
+        }
     }
     fn on_draw_build(&self, builder: &mut DrawBuilder) {
         build_draw_for_button(
             builder,
             self.background.clone(),
-            self.private.state,
+            ButtonState::Normal,
             self.size(),
         );
-
-        builder.add_text(
-            if self.on {
-                &self.on_text
-            } else {
-                &self.off_text
-            },
-            &self.font,
-            self.size(),
-            self.text_color,
-            Default::default(),
-            self.font_size.to_pixels(self.size().minxy(), 1.0),
+        build_draw_for_button(
+            builder,
+            self.background.clone(),
+            self.private.state,
+            self.size() * Vec2px::new(self.ratio(), 1.0),
         );
     }
     fn size(&self) -> Vec2px {
@@ -698,12 +713,31 @@ impl Widget for Toggle {
     }
 }
 
-#[derive(Default)]
+impl LinearBar {
+    pub fn ratio(&self) -> f32 {
+        (self.value - self.minimum) / (self.maximum - self.minimum)
+    }
+
+    fn update_value(&mut self, curosr_x: f32) {
+        let ratio = curosr_x / self.size().x;
+        let ratio = if ratio < 0.0 {
+            0.0
+        } else if ratio > 1.0 {
+            1.0
+        } else {
+            ratio
+        };
+
+        self.value = ratio * (self.maximum - self.minimum) + self.minimum;
+    }
+}
+
+#[derive(Default, Clone)]
 pub struct ImagePrivate {
     real_size: Vec2px,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Image {
     pub size: WidgetSize,
     pub name: String,
@@ -739,14 +773,14 @@ impl Image {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct SquarePrivate {
     inner_size: Vec2px,
     outer_size: Vec2px,
     stacking_depth: f32,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Square {
     pub private: SquarePrivate,
 }
@@ -774,14 +808,14 @@ impl Widget for Square {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct OuterSquarePrivate {
     inner_size: Vec2px,
     outer_size: Vec2px,
     stacking_depth: f32,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct OuterSquare {
     pub private: OuterSquarePrivate,
 }
@@ -809,11 +843,13 @@ impl Widget for OuterSquare {
     }
 }
 
+#[derive(Clone)]
 pub struct OverlayPrivate {
     size: Vec2px,
     stacking_depth: f32,
 }
 
+#[derive(Clone)]
 pub struct Overlay {
     pub color: Vec4,
     pub private: OverlayPrivate,
@@ -866,12 +902,12 @@ impl Widget for Overlay {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct LinesPrivate {
     real_size: Vec2px,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Lines {
     pub size: WidgetSize,
     pub lines: Vec<(GuiPoint, GuiPoint)>,
@@ -892,5 +928,52 @@ impl Widget for Lines {
     }
     fn size(&self) -> Vec2px {
         self.private.real_size
+    }
+}
+
+#[allow(unused_must_use)]
+pub mod gui_primitives {
+    use super::*;
+    use std::collections::HashMap;
+    use std::fmt::Display;
+    use std::iter::FromIterator;
+
+    pub fn build_table<S, T>(height: f32, table: &HashMap<S, T>)
+    where
+        S: Display + PartialOrd,
+        T: Display + PartialOrd,
+    {
+        build_table_proto(height, table, Default::default(), Default::default());
+    }
+
+    pub fn build_table_proto<S, T>(
+        height: f32,
+        table: &HashMap<S, T>,
+        name_text_proto: Text,
+        val_text_proto: Text,
+    ) where
+        S: Display + PartialOrd,
+        T: Display + PartialOrd,
+    {
+        let items = table.len();
+        -GridLayout {
+            row_heights: vec![GuiDimension::Units(height); items],
+            col_widths: vec![GuiDimension::Relative(1.0), GuiDimension::Relative(1.0)],
+            ..Default::default()
+        } << {
+            let mut vec = Vec::from_iter(table.iter());
+            vec.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+            for (name, val) in vec.iter() {
+                -Text {
+                    text: format!("{}", name),
+                    ..name_text_proto.clone()
+                };
+                -Text {
+                    text: format!("{}", val),
+                    ..val_text_proto.clone()
+                };
+            }
+        };
     }
 }

@@ -1,7 +1,7 @@
 use std::error::Error;
-use std::fmt;
+use std::{fmt, io};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ShaderCompileError {
     details: String,
 }
@@ -27,5 +27,23 @@ impl fmt::Display for ShaderCompileError {
 impl Error for ShaderCompileError {
     fn description(&self) -> &str {
         &self.details
+    }
+}
+
+#[derive(Debug)]
+pub enum ShaderLoadError {
+    IoError(io::Error),
+    CompileError(ShaderCompileError),
+}
+
+impl From<io::Error> for ShaderLoadError {
+    fn from(e: io::Error) -> Self {
+        ShaderLoadError::IoError(e)
+    }
+}
+
+impl From<ShaderCompileError> for ShaderLoadError {
+    fn from(e: ShaderCompileError) -> Self {
+        ShaderLoadError::CompileError(e)
     }
 }

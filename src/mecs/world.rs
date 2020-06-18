@@ -24,6 +24,7 @@ use super::system::*;
 
 use self::glutin::event::*;
 use self::glutin::platform::desktop::EventLoopExtDesktop;
+use gui::{GuiBuilder, GuiContext};
 use mecs::render_pipeline::DefaultPipeline;
 use mecs::SystemSet;
 use mecs::{Component, Entity, RenderPipeline};
@@ -199,6 +200,15 @@ impl World {
                         ))
                         .receive(&msg.payload, &mut self.static_world);
                 }
+                MessageTarget::SystemOfType(sys_type) => {
+                    self.systems
+                        .first_of_type_mut(sys_type)
+                        .expect(&format!(
+                            "Message {:?} sent to non-existing system!",
+                            msg.payload
+                        ))
+                        .receive(&msg.payload, &mut self.static_world);
+                }
                 MessageTarget::Root => {
                     if msg.payload.is::<message::Exit>() {
                         self.running = false;
@@ -355,30 +365,29 @@ impl World {
             } = data;
 
             event_loop.run_return(move |event, _, mut control_flow| {
-                if self.glutin_update_control(&event, &mut control_flow, update_interval) {
-                    win.window().request_redraw();
-                }
+                self.glutin_update_control(&event, &mut control_flow, update_interval);
+
                 match event {
                     Event::WindowEvent { event, .. } => {
                         self.glutin_window_event(&event);
-                        win.window().request_redraw();
 
-                        for id in &self.ui_aware_systems {
-                            self.systems
-                                .system_boxed_mut(*id)
-                                .unwrap()
-                                .window_event(&event, &mut self.static_world);
-                        }
+                        self.render_pipeline.event(
+                            &mut self.static_world,
+                            &mut self.systems,
+                            &self.ui_aware_systems,
+                            &GlutinEvent::WindowEvent(event),
+                        );
 
                         self.deliver_all_messages();
                     }
                     Event::DeviceEvent { event, .. } => {
-                        for id in &self.ui_aware_systems {
-                            self.systems
-                                .system_boxed_mut(*id)
-                                .unwrap()
-                                .device_event(&event, &mut self.static_world);
-                        }
+                        self.render_pipeline.event(
+                            &mut self.static_world,
+                            &mut self.systems,
+                            &self.ui_aware_systems,
+                            &GlutinEvent::DeviceEvent(event),
+                        );
+
                         self.deliver_all_messages();
                     }
                     Event::RedrawRequested(..) => {
@@ -394,6 +403,7 @@ impl World {
                     }
                     Event::MainEventsCleared => {
                         self.deliver_all_messages();
+                        win.window().request_redraw();
                     }
                     _ => (),
                 }
@@ -423,6 +433,22 @@ impl World {
             },
             _ => (),
         }
+    }
+
+    pub fn add_gui<T>(&mut self, gui_builder: T)
+    where
+        T: GuiBuilder + 'static,
+    {
+        let gui_context = GuiContext::new(
+            self.window_info().unwrap(),
+            false,
+            gui_builder,
+            &mut self.static_world,
+        );
+
+        let id = self.add_system(gui_context);
+
+        self.make_system_ui_aware(id);
     }
 }
 

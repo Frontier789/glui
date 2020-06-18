@@ -8,8 +8,12 @@ use std::time::Duration;
 use tools::camera_parameters::CameraParameters;
 
 pub trait CameraController: Downcast + Debug {
-    fn on_window_event(&mut self, _cam: &mut CameraParameters, _event: &GlutinWindowEvent) {}
-    fn on_device_event(&mut self, _cam: &mut CameraParameters, _event: &GlutinDeviceEvent) {}
+    fn on_window_event(&mut self, _cam: &mut CameraParameters, _event: &GlutinWindowEvent) -> bool {
+        false
+    }
+    fn on_device_event(&mut self, _cam: &mut CameraParameters, _event: &GlutinDeviceEvent) -> bool {
+        false
+    }
     fn update(&mut self, _cam: &mut CameraParameters, _delta: Duration) {}
     fn init(&self, _cam: &mut CameraParameters) {}
 }

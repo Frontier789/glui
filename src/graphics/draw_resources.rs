@@ -1,6 +1,7 @@
 use graphics::DrawShaderSelector;
 use mecs::WindowInfo;
 use std::collections::HashMap;
+use std::time::Instant;
 use tools::{
     DrawShader, Font, FontLoader, FontLoaderError, Mat4, RgbaTexture, ShaderCompileError, Texture,
     Vec2,
@@ -22,6 +23,7 @@ pub struct DrawResources {
     pub inv_view_matrix: Mat4,
     pub inv_projection_matrix: Mat4,
     pub uv_matrix: Mat4,
+    pub clock: Instant,
     pub window_info: WindowInfo,
 }
 
@@ -37,6 +39,7 @@ impl DrawResources {
             inv_view_matrix: Mat4::identity(),
             model_matrix: Mat4::identity(),
             uv_matrix: Mat4::identity(),
+            clock: Instant::now(),
             window_info,
         })
     }

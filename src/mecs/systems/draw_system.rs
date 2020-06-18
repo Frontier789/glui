@@ -62,22 +62,22 @@ impl System for DrawSystem {
         }
     }
 
-    fn window_event(&mut self, event: &GlutinWindowEvent, world: &mut StaticWorld) {
-        let camera = world
-            .component_mut::<DataComponent<Camera>>(self.camera_entity)
-            .unwrap();
-        camera.data.on_window_event(event);
-
+    fn window_event(&mut self, event: &GlutinWindowEvent, world: &mut StaticWorld) -> bool {
         if let GlutinWindowEvent::Resized(s) = event {
             self.resources.window_info.size = Vec2::new(s.width as f32, s.height as f32);
         }
-    }
 
-    fn device_event(&mut self, event: &GlutinDeviceEvent, world: &mut StaticWorld) {
         let camera = world
             .component_mut::<DataComponent<Camera>>(self.camera_entity)
             .unwrap();
-        camera.data.on_device_event(event);
+        camera.data.on_window_event(event)
+    }
+
+    fn device_event(&mut self, event: &GlutinDeviceEvent, world: &mut StaticWorld) -> bool {
+        let camera = world
+            .component_mut::<DataComponent<Camera>>(self.camera_entity)
+            .unwrap();
+        camera.data.on_device_event(event)
     }
 }
 
@@ -100,5 +100,19 @@ impl DrawSystem {
             camera_entity,
             resources: draw_res,
         }
+    }
+
+    pub fn camera<'a>(&self, world: &'a StaticWorld) -> &'a Camera {
+        &world
+            .component::<DataComponent<Camera>>(self.camera_entity)
+            .unwrap()
+            .data
+    }
+
+    pub fn camera_mut<'a>(&self, world: &'a mut StaticWorld) -> &'a mut Camera {
+        &mut world
+            .component_mut::<DataComponent<Camera>>(self.camera_entity)
+            .unwrap()
+            .data
     }
 }

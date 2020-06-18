@@ -1,7 +1,8 @@
+#![feature(clamp)]
 extern crate alloc;
-extern crate font_kit;
 extern crate core;
 extern crate downcast_rs;
+extern crate font_kit;
 
 #[macro_use]
 pub mod gui;
