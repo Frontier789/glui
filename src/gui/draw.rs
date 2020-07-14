@@ -224,17 +224,8 @@ impl<'a> DrawBuilder<'a> {
         render_seq.add_buffer(pbuf.into_base_type());
         render_seq.add_buffer(cbuf.into_base_type());
 
-        let mut uniforms = vec![Uniform::Matrix4(
-            "projection".to_owned(),
-            Mat4::ortho(
-                0.0,
-                self.draw_resources.window_info.size.y,
-                self.draw_resources.window_info.size.x,
-                0.0,
-                1.0,
-                -1.0,
-            ),
-        )];
+        let mut uniforms = vec![];
+        
         let shader;
         if let (Some(tex), Some(_)) = (&self.objects[beg].tex, &self.objects[beg].tpt) {
             let tpt: Vec<Vec2> = self.objects[beg..end]
@@ -244,12 +235,12 @@ impl<'a> DrawBuilder<'a> {
                 .collect();
             let tbuf = Buffer::from_vec(&tpt);
             vao.attrib_buffer(2, &tbuf);
-            shader = DrawShaderSelector::DefaultTextured;
+            shader = DrawShaderSelector::Textured;
             render_seq.add_buffer(tbuf.into_base_type());
 
             uniforms.push(Uniform::Texture2D("tex".to_owned(), *tex));
         } else {
-            shader = DrawShaderSelector::DefaultColored;
+            shader = DrawShaderSelector::Colored;
         }
         render_seq.add_command(RenderCommand {
             vao,

@@ -2,12 +2,13 @@ use super::bimap::BiMap;
 use super::component::*;
 use super::message::*;
 use mecs::entity::Entity;
-use mecs::System;
+use mecs::{GlutinElementState, GlutinKey, System};
 use std::any::TypeId;
 use std::collections::HashMap;
 
 #[derive(Default)]
 pub struct StaticWorld {
+    pub(super) key_states: HashMap<GlutinKey, GlutinElementState>,
     entities: HashMap<Entity, Vec<Box<dyn Component>>>,
     entity_names: BiMap<String, Entity>,
     next_entity_id: usize,
@@ -35,6 +36,9 @@ impl StaticWorld {
     pub fn delete_entity(&mut self, entity: Entity) {
         self.entities.remove(&entity);
         self.entity_names.remove_by_right(&entity);
+    }
+    pub fn entities(&self) -> Vec<Entity> {
+        self.entities.keys().into_iter().map(|e| *e).collect()
     }
 
     pub fn with_component<C, R, F>(&self, entity: Entity, mut fun: F) -> Option<R>
@@ -112,6 +116,16 @@ impl StaticWorld {
             components.push(Box::new(component));
         }
     }
+    pub fn new_entity_with_component<C>(&mut self, component: C) -> Entity
+    where
+        C: Component,
+    {
+        let entity = self.entity();
+        if let Some(components) = self.entities.get_mut(&entity) {
+            components.push(Box::new(component));
+        }
+        entity
+    }
     pub fn entities_with_component<C>(&self) -> Vec<(Entity, &C)>
     where
         C: Component,
@@ -171,5 +185,13 @@ impl StaticWorld {
         M: Message,
     {
         self.send_annotated((MessageTarget::Broadcast, msg).into());
+    }
+
+    pub fn is_key_pressed(&self, key: GlutinKey) -> bool {
+        if let Some(GlutinElementState::Pressed) = self.key_states.get(&key) {
+            true
+        } else {
+            false
+        }
     }
 }

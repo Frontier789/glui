@@ -68,17 +68,17 @@ impl Vec4 {
         Vec4 { x, y, z, w }
     }
 
-    pub fn rgb(&self) -> Vec3 {
+    pub fn rgb(self) -> Vec3 {
         Vec3::new(self.x, self.y, self.z)
     }
     pub fn xyz(self) -> Vec3 {
         Vec3::new(self.x, self.y, self.z)
     }
 
-    pub fn dot(&self, v: Vec4) -> f32 {
+    pub fn dot(self, v: Vec4) -> f32 {
         self.x * v.x + self.y * v.y + self.z * v.z
     }
-    pub fn intensity(&self) -> f32 {
+    pub fn intensity(self) -> f32 {
         self.x * 0.299 + self.y * 0.587 + self.z * 0.144
     }
 

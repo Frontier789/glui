@@ -38,6 +38,8 @@ impl RenderCommand {
         );
         shader.set_uniform("model", draw_resources.model_matrix);
         shader.set_uniform("MVP", draw_resources.MVP());
+        shader.set_uniform("normal_MV", draw_resources.normal_matrix_MV());
+        shader.set_uniform("normal_model", draw_resources.normal_matrix_model());
         shader.set_uniform("time", draw_resources.clock.elapsed().as_secs_f32());
         shader.set_uniform("uv_matrix", draw_resources.uv_matrix);
     }

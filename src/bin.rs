@@ -86,12 +86,14 @@ impl GuiBuilder for Data {
                     let text = format!("{}", i + self.goat);
                     self.mybutton(text, i == 13);
                 }
-                -Toggle {
-                    on: self.show_red,
-                    on_text: "ON".to_owned(),
-                    off_text: "OFF".to_owned(),
-                    callback: self.make_callback2(|data, button: &Toggle| {
-                        data.show_red = button.on;
+                -Button {
+                    text: if self.show_red {
+                        "ON".to_owned()
+                    } else {
+                        "OFF".to_owned()
+                    },
+                    callback: self.make_callback1(|data| {
+                        data.show_red = !data.show_red;
                     }),
                     ..Default::default()
                 };

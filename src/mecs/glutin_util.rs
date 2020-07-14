@@ -33,6 +33,7 @@ where
         gl::Clear(gl::COLOR_BUFFER_BIT);
         gl::Enable(gl::DEPTH_TEST);
         gl::Enable(gl::PRIMITIVE_RESTART_FIXED_INDEX);
+        gl::Enable(gl::CULL_FACE);
         gl::DepthFunc(gl::LEQUAL);
     }
 }

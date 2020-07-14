@@ -118,8 +118,19 @@ where
             gui_builder_new: gui_builder.clone(),
             gui_builder,
         };
+        gui_context.update_projection_matrix();
         gui_context.rebuild_gui(world);
         gui_context
+    }
+    fn update_projection_matrix(&mut self) {
+        self.draw_res.projection_matrix = Mat4::ortho(
+            0.0,
+            self.draw_res.window_info.size.y,
+            self.draw_res.window_info.size.x,
+            0.0,
+            1.0,
+            -1.0,
+        );
     }
     fn rebuild_render_seq(&mut self) {
         self.profiler.begin("Rebuild_Render");
@@ -165,6 +176,7 @@ where
     }
     pub fn resized(&mut self, s: Vec2, world: &mut StaticWorld) {
         self.draw_res.window_info.size = s;
+        self.update_projection_matrix();
         self.rebuild_gui(world);
     }
     pub fn widget_count(&self) -> usize {

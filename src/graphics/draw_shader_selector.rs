@@ -2,9 +2,10 @@ use tools::DrawShader;
 
 #[derive(Debug, PartialEq)]
 pub enum DrawShaderSelector {
-    DefaultUniformColor,
-    DefaultColored,
-    DefaultTextured,
+    UniformColored,
+    Colored,
+    Textured,
+    DiffusePhong,
     Custom(DrawShader),
 }
 

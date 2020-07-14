@@ -3,7 +3,6 @@ use mecs::{
     GlutinWindowEvent,
 };
 use std::collections::HashMap;
-use std::f32::consts::PI;
 use tools::{CameraController, CameraParameters, CameraSpatialParams, Vec2};
 
 #[derive(Debug)]
@@ -14,6 +13,7 @@ pub struct ModelViewController {
     real_spatial: CameraSpatialParams,
     drag_offset: Vec2,
     rotation_direction: Option<Vec2>,
+    pub disable_roll: bool,
 }
 
 impl CameraController for ModelViewController {
@@ -62,13 +62,7 @@ impl CameraController for ModelViewController {
                     self.key_pressed
                         .insert(keycode, input.state == GlutinElementState::Pressed);
 
-                    if keycode == GlutinKey::R && input.state == GlutinElementState::Pressed {
-                        self.real_spatial.add_roll(-self.real_spatial.roll());
-                        cam.spatial = self.real_spatial;
-                        true
-                    } else if keycode == GlutinKey::LAlt
-                        && input.state == GlutinElementState::Released
-                    {
+                    if keycode == GlutinKey::LAlt && input.state == GlutinElementState::Released {
                         self.real_spatial.snap_view(0.9);
                         cam.spatial = self.real_spatial;
                         true
@@ -88,6 +82,9 @@ impl CameraController for ModelViewController {
                 let right = self.is_button_pressed(GlutinButton::Right);
                 if left && !right {
                     let mut delta = Vec2::new(delta.0 as f32, delta.1 as f32);
+                    if self.disable_roll {
+                        delta.x *= self.real_spatial.cos_pitch();
+                    }
                     if self.rotation_direction == None {
                         self.drag_offset += delta;
                         if self.drag_offset.length() > 20.0 {
@@ -109,6 +106,10 @@ impl CameraController for ModelViewController {
                         let d = d.rotate(self.real_spatial.r(), delta.y * 0.01);
 
                         self.real_spatial.set_pos(self.real_spatial.target + d);
+                    }
+
+                    if self.disable_roll {
+                        self.real_spatial.cancel_roll(true);
                     }
                 }
                 if right && !left {
@@ -180,6 +181,7 @@ impl ModelViewController {
             real_spatial: Default::default(),
             drag_offset: Vec2::zero(),
             rotation_direction: None,
+            disable_roll: false,
         }
     }
 }

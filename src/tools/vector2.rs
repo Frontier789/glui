@@ -40,15 +40,15 @@ impl Vec2 {
         }
     }
 
-    pub fn length(&self) -> f32 {
+    pub fn length(self) -> f32 {
         Float::sqrt(self.x * self.x + self.y * self.y)
     }
 
-    pub fn length_squared(&self) -> f32 {
+    pub fn length_squared(self) -> f32 {
         self.x * self.x + self.y * self.y
     }
 
-    pub fn norm(&self, p: f32) -> f32 {
+    pub fn norm(self, p: f32) -> f32 {
         if p.is_infinite() {
             self.unsign().max()
         } else {
@@ -56,10 +56,10 @@ impl Vec2 {
         }
     }
 
-    pub fn snap_if_close(&self, cos_of_angle: f32, directions: Vec<Vec2>) -> Vec2 {
+    pub fn snap_if_close(self, cos_of_angle: f32, directions: Vec<Vec2>) -> Vec2 {
         let len = self.length();
 
-        let mut dir = *self / len;
+        let mut dir = self / len;
         for principal_dir in directions {
             if principal_dir.dot(dir) > cos_of_angle {
                 dir = principal_dir;
@@ -91,7 +91,7 @@ impl Vec2 {
         ]
     }
 
-    pub fn sgn(&self) -> Self {
+    pub fn sgn(self) -> Self {
         let l = self.length();
         Self {
             x: self.x / l,
@@ -99,7 +99,7 @@ impl Vec2 {
         }
     }
 
-    pub fn minxy(&self) -> f32 {
+    pub fn minxy(self) -> f32 {
         if self.x < self.y {
             self.x
         } else {
@@ -107,7 +107,7 @@ impl Vec2 {
         }
     }
 
-    pub fn maxxy(&self) -> f32 {
+    pub fn maxxy(self) -> f32 {
         if self.x > self.y {
             self.x
         } else {
@@ -115,26 +115,26 @@ impl Vec2 {
         }
     }
 
-    pub fn unsign(&self) -> Self {
+    pub fn unsign(self) -> Self {
         Vec2::new(f32::abs(self.x), f32::abs(self.y))
     }
 
-    pub fn max(&self) -> f32 {
+    pub fn max(self) -> f32 {
         self.x.max(self.y)
     }
 
-    pub fn dot(&self, v: Self) -> f32 {
+    pub fn dot(self, v: Self) -> f32 {
         self.x * v.x + self.y * v.y
     }
 
-    pub fn perp(&self) -> Self {
+    pub fn perp(self) -> Self {
         Self {
             x: self.y * (-1f32),
             y: self.x,
         }
     }
 
-    pub fn aspect(&self) -> f32 {
+    pub fn aspect(self) -> f32 {
         self.x / self.y
     }
 }
@@ -224,6 +224,17 @@ impl Mul<f32> for Vec2 {
         Vec2 {
             x: self.x * factor,
             y: self.y * factor,
+        }
+    }
+}
+
+impl Mul<Vec2> for f32 {
+    type Output = Vec2;
+
+    fn mul(self, other: Vec2) -> Vec2 {
+        Vec2 {
+            x: self * other.x,
+            y: self * other.y,
         }
     }
 }

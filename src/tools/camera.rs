@@ -56,7 +56,7 @@ impl Camera {
             params: CameraParameters {
                 spatial: Default::default(),
                 projection: Projection::Perspective,
-                fov: std::f32::consts::PI * 90.0 / 180.0,
+                fov: std::f32::consts::PI * 100.0 / 180.0,
                 texel_scale: 1.0,
                 znear: 0.1,
                 zfar: 1000.0,

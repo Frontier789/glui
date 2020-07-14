@@ -9,6 +9,7 @@ use tools::{
 
 pub struct DefaultDrawShaders {
     pub uniform_color: DrawShader,
+    pub diffuse_phong: DrawShader,
     pub colored: DrawShader,
     pub textured: DrawShader,
 }
@@ -48,9 +49,10 @@ impl DrawResources {
     }
     pub fn get_shader<'a>(&'a self, selector: &'a DrawShaderSelector) -> &'a DrawShader {
         match selector {
-            DrawShaderSelector::DefaultUniformColor => &self.shaders.uniform_color,
-            DrawShaderSelector::DefaultColored => &self.shaders.colored,
-            DrawShaderSelector::DefaultTextured => &self.shaders.textured,
+            DrawShaderSelector::UniformColored => &self.shaders.uniform_color,
+            DrawShaderSelector::Colored => &self.shaders.colored,
+            DrawShaderSelector::Textured => &self.shaders.textured,
+            DrawShaderSelector::DiffusePhong => &self.shaders.diffuse_phong,
             DrawShaderSelector::Custom(shader) => shader,
         }
     }
@@ -82,17 +84,28 @@ impl DrawResources {
         let col_shader = DrawShader::compile(COL_VERT_SOURCE, COL_FRAG_SOURCE)?;
         let uni_col_shader = DrawShader::compile(UNI_COL_VERT_SOURCE, UNI_COL_FRAG_SOURCE)?;
         let tex_shader = DrawShader::compile(TEX_VERT_SOURCE, TEX_FRAG_SOURCE)?;
+        let dif_shader = DrawShader::compile(DIF_VERT_SOURCE, DIF_FRAG_SOURCE)?;
 
         Ok(DefaultDrawShaders {
             uniform_color: uni_col_shader,
             colored: col_shader,
             textured: tex_shader,
+            diffuse_phong: dif_shader,
         })
     }
 
     #[allow(non_snake_case)]
     pub fn MVP(&self) -> Mat4 {
         self.projection_matrix * self.view_matrix * self.model_matrix
+    }
+
+    #[allow(non_snake_case)]
+    pub fn normal_matrix_MV(&self) -> Mat4 {
+        (self.view_matrix * self.model_matrix).inverse().transpose()
+    }
+
+    pub fn normal_matrix_model(&self) -> Mat4 {
+        self.model_matrix.inverse().transpose()
     }
 }
 
@@ -101,15 +114,13 @@ const COL_VERT_SOURCE: &'static str = "#version 420 core
     layout(location = 0) in vec3 pos;
     layout(location = 1) in vec4 clr;
     
-    uniform mat4 model;
-    uniform mat4 view;
-    uniform mat4 projection;
+    uniform mat4 MVP;
     
     out vec4 va_clr;
     
     void main()
     {
-        gl_Position = projection * view * model * vec4(pos, 1);
+        gl_Position = MVP * vec4(pos, 1);
         
         va_clr = clr;
     }";
@@ -127,13 +138,11 @@ const UNI_COL_VERT_SOURCE: &'static str = "#version 420 core
     
     layout(location = 0) in vec3 pos;
     
-    uniform mat4 model;
-    uniform mat4 view;
-    uniform mat4 projection;
+    uniform mat4 MVP;
     
     void main()
     {
-        gl_Position = projection * view * model * vec4(pos, 1);
+        gl_Position = MVP * vec4(pos, 1);
     }";
 const UNI_COL_FRAG_SOURCE: &'static str = "#version 420 core
     
@@ -152,9 +161,7 @@ const TEX_VERT_SOURCE: &'static str = "#version 420 core
     layout(location = 1) in vec4 clr;
     layout(location = 2) in vec2 tpt;
     
-    uniform mat4 model;
-    uniform mat4 view;
-    uniform mat4 projection;
+    uniform mat4 MVP;
     uniform mat4 uv_matrix;
     
     out vec4 va_clr;
@@ -162,7 +169,7 @@ const TEX_VERT_SOURCE: &'static str = "#version 420 core
     
     void main()
     {
-        gl_Position = projection * view * model * vec4(pos, 1);
+        gl_Position = MVP * vec4(pos, 1);
         
         va_clr = clr;
         va_tpt = (uv_matrix * vec4(tpt,0,1)).xy;
@@ -179,4 +186,34 @@ const TEX_FRAG_SOURCE: &'static str = "#version 420 core
     void main()
     {
         color = va_clr * texture(tex, va_tpt);
+    }";
+
+const DIF_VERT_SOURCE: &'static str = "#version 420 core
+    
+    layout(location = 0) in vec3 pos;
+    layout(location = 3) in vec3 nrm;
+    
+    uniform mat4 MVP;
+    uniform mat4 normal_model;
+    
+    out vec3 va_nrm;
+    
+    void main()
+    {
+        gl_Position = MVP * vec4(pos, 1);
+        
+        va_nrm = vec3(normal_model * vec4(nrm, 0));
+    }";
+const DIF_FRAG_SOURCE: &'static str = "#version 420 core
+    
+    uniform vec3 L = normalize(vec3(1,1,1));
+    
+    in vec3 va_nrm;
+    
+    out vec4 color;
+    
+    void main()
+    {
+        float d = dot(normalize(va_nrm), L);
+        color = vec4(vec3(max(d,0) + 0.1), 1);
     }";

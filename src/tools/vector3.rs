@@ -2,6 +2,8 @@ extern crate num;
 
 use self::num::Float;
 use super::vector2::Vec2;
+use std::fmt;
+use std::fmt::Formatter;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use tools::{Mat4, Vec4};
 
@@ -11,6 +13,12 @@ pub struct Vec3 {
     pub x: f32,
     pub y: f32,
     pub z: f32,
+}
+
+impl fmt::Display for Vec3 {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "({},{},{})", self.x, self.y, self.z)
+    }
 }
 
 impl Vec3 {
@@ -64,11 +72,19 @@ impl Vec3 {
         self - n * self.dot(n)
     }
 
-    pub fn length(&self) -> f32 {
+    pub fn proj_to(self, v: Vec3) -> Vec3 {
+        v * self.dot(v)
+    }
+
+    pub fn length(self) -> f32 {
         Float::sqrt(self.x * self.x + self.y * self.y + self.z * self.z)
     }
 
-    pub fn norm(&self, p: f32) -> f32 {
+    pub fn length_squared(self) -> f32 {
+        self.x * self.x + self.y * self.y + self.z * self.z
+    }
+
+    pub fn norm(self, p: f32) -> f32 {
         if p.is_infinite() {
             self.unsign().max()
         } else {
@@ -76,10 +92,10 @@ impl Vec3 {
         }
     }
 
-    pub fn snap_if_close(&self, cos_of_angle: f32, directions: Vec<Vec3>) -> Vec3 {
+    pub fn snap_if_close(self, cos_of_angle: f32, directions: Vec<Vec3>) -> Vec3 {
         let len = self.length();
 
-        let mut dir = *self / len;
+        let mut dir = self / len;
         for principal_dir in directions {
             if principal_dir.dot(dir) > cos_of_angle {
                 dir = principal_dir;
@@ -100,7 +116,7 @@ impl Vec3 {
         ]
     }
 
-    pub fn sgn(&self) -> Vec3 {
+    pub fn sgn(self) -> Vec3 {
         let l = self.length();
         Vec3 {
             x: self.x / l,
@@ -109,14 +125,14 @@ impl Vec3 {
         }
     }
 
-    pub fn xzy(&self) -> Vec3 {
+    pub fn xzy(self) -> Vec3 {
         Vec3 {
             x: self.x,
             y: self.z,
             z: self.y,
         }
     }
-    pub fn unsign(&self) -> Vec3 {
+    pub fn unsign(self) -> Vec3 {
         Vec3 {
             x: self.x.abs(),
             y: self.z.abs(),
@@ -124,15 +140,15 @@ impl Vec3 {
         }
     }
 
-    pub fn max(&self) -> f32 {
+    pub fn max(self) -> f32 {
         self.x.max(self.y.max(self.z))
     }
 
-    pub fn dot(&self, v: Vec3) -> f32 {
+    pub fn dot(self, v: Vec3) -> f32 {
         self.x * v.x + self.y * v.y + self.z * v.z
     }
 
-    pub fn cross(&self, v: Vec3) -> Vec3 {
+    pub fn cross(self, v: Vec3) -> Vec3 {
         Vec3 {
             x: self.y * v.z - self.z * v.y,
             y: self.z * v.x - self.x * v.z,
@@ -140,7 +156,7 @@ impl Vec3 {
         }
     }
 
-    pub fn intensity(&self) -> f32 {
+    pub fn intensity(self) -> f32 {
         self.x * 0.299 + self.y * 0.587 + self.z * 0.144
     }
 
@@ -161,6 +177,9 @@ impl Vec3 {
     }
     pub fn rotate(self, axis: Vec3, angle: f32) -> Vec3 {
         (Mat4::rotate(axis, angle) * Vec4::from_vec3(self, 1.0)).xyz()
+    }
+    pub fn xz(self) -> Vec2 {
+        Vec2::new(self.x, self.z)
     }
 }
 

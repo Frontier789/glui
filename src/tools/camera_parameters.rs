@@ -82,6 +82,10 @@ impl CameraSpatialParams {
         let v = self.v();
         v.y.asin()
     }
+    pub fn cos_pitch(&self) -> f32 {
+        let v = self.v();
+        1.0 - v.y * v.y
+    }
     pub fn yaw(&self) -> f32 {
         let f = self.f().sgn();
         (-f.z).acos() * f.x.signum()
@@ -121,6 +125,23 @@ impl CameraSpatialParams {
 
         let snapped = self.up.snap_if_close(sensitivity, Vec3::base_directions());
         self.set_up(snapped);
+    }
+    pub fn look_at(&mut self, pos: Vec3, target: Vec3, up: Vec3) {
+        self.pos = pos;
+        self.target = target;
+        self.up = -up.cross(self.v()).cross(self.v()).sgn();
+    }
+    pub fn cancel_roll(&mut self, allow_upside_down: bool) {
+        let roll = self.roll();
+        let target = if allow_upside_down && roll < -PI * 0.9 {
+            -PI
+        } else if allow_upside_down && roll > PI * 0.9 {
+            PI
+        } else {
+            0.0
+        };
+
+        self.add_roll(target - roll);
     }
 }
 
@@ -185,5 +206,11 @@ impl CameraParameters {
     }
     pub fn rotate(&mut self, axis: Vec3, angle: f32) {
         self.spatial.rotate(axis, angle)
+    }
+    pub fn look_at(&mut self, pos: Vec3, target: Vec3, up: Vec3) {
+        self.spatial.look_at(pos, target, up)
+    }
+    pub fn cancel_roll(&mut self, allow_upside_down: bool) {
+        self.spatial.cancel_roll(allow_upside_down)
     }
 }

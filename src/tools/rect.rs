@@ -92,10 +92,10 @@ impl Rect {
     pub fn triangulate(self) -> Vec<Vec2> {
         vec![
             Vec2::new(self.left, self.top),
+            Vec2::new(self.right, self.bottom),
             Vec2::new(self.right, self.top),
             Vec2::new(self.right, self.bottom),
             Vec2::new(self.left, self.top),
-            Vec2::new(self.right, self.bottom),
             Vec2::new(self.left, self.bottom),
         ]
     }
@@ -103,10 +103,10 @@ impl Rect {
     pub fn triangulate_3d(self) -> Vec<Vec3> {
         vec![
             Vec3::new(self.left, self.top, 0.0),
+            Vec3::new(self.right, self.bottom, 0.0),
             Vec3::new(self.right, self.top, 0.0),
             Vec3::new(self.right, self.bottom, 0.0),
             Vec3::new(self.left, self.top, 0.0),
-            Vec3::new(self.right, self.bottom, 0.0),
             Vec3::new(self.left, self.bottom, 0.0),
         ]
     }

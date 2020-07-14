@@ -1,7 +1,6 @@
 extern crate gl;
 extern crate glutin;
 
-use std::collections::HashSet;
 use std::mem::swap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::*;
@@ -34,7 +33,6 @@ pub struct World {
     systems: SystemSet,
     loop_data: MessageLoopData,
     render_pipeline: Box<dyn RenderPipeline>,
-    ui_aware_systems: HashSet<SystemId>,
     running: bool,
 }
 
@@ -47,7 +45,6 @@ impl Default for World {
             render_pipeline: Box::new(DefaultPipeline {
                 bgcolor: Vec3::new(0.3, 0.3, 0.3),
             }),
-            ui_aware_systems: Default::default(),
             running: Default::default(),
         }
     }
@@ -55,7 +52,7 @@ impl Default for World {
 
 impl World {
     pub fn default_update_interval() -> Duration {
-        Duration::from_millis(30)
+        Duration::from_millis(20)
     }
     pub fn entity(&mut self) -> Entity {
         self.as_static_mut().entity()
@@ -167,12 +164,8 @@ impl World {
     {
         self.systems.add_system(system)
     }
-    pub fn make_system_ui_aware(&mut self, id: SystemId) {
-        self.ui_aware_systems.insert(id);
-    }
     pub fn del_system(&mut self, id: SystemId) {
         self.systems.del_system(id);
-        self.ui_aware_systems.remove(&id);
     }
 
     pub fn deliver_all_messages(&mut self) {
@@ -369,14 +362,13 @@ impl World {
 
                 match event {
                     Event::WindowEvent { event, .. } => {
-                        self.glutin_window_event(&event);
-
-                        self.render_pipeline.event(
-                            &mut self.static_world,
-                            &mut self.systems,
-                            &self.ui_aware_systems,
-                            &GlutinEvent::WindowEvent(event),
-                        );
+                        if self.glutin_window_event(&event) {
+                            self.render_pipeline.event(
+                                &mut self.static_world,
+                                &mut self.systems,
+                                &GlutinEvent::WindowEvent(event),
+                            );
+                        }
 
                         self.deliver_all_messages();
                     }
@@ -384,18 +376,14 @@ impl World {
                         self.render_pipeline.event(
                             &mut self.static_world,
                             &mut self.systems,
-                            &self.ui_aware_systems,
                             &GlutinEvent::DeviceEvent(event),
                         );
 
                         self.deliver_all_messages();
                     }
                     Event::RedrawRequested(..) => {
-                        self.render_pipeline.render(
-                            &mut self.static_world,
-                            &mut self.systems,
-                            &self.ui_aware_systems,
-                        );
+                        self.render_pipeline
+                            .render(&mut self.static_world, &mut self.systems);
                         win.swap_buffers().unwrap();
                     }
                     Event::UserEvent(msg) => {
@@ -414,18 +402,24 @@ impl World {
         }
     }
 
-    fn glutin_window_event(&mut self, event: &glutin::event::WindowEvent) {
+    fn glutin_window_event(&mut self, event: &glutin::event::WindowEvent) -> bool {
         match event {
             glutin::event::WindowEvent::CloseRequested => {
                 self.running = false;
             }
             glutin::event::WindowEvent::KeyboardInput { input, .. } => {
-                match input.virtual_keycode {
-                    None => (),
-                    Some(glutin::event::VirtualKeyCode::Escape) => {
+                if let Some(key) = input.virtual_keycode {
+                    if key == glutin::event::VirtualKeyCode::Escape {
                         self.running = false;
                     }
-                    _ => {}
+
+                    if input.state == GlutinElementState::Pressed
+                        && self.static_world.is_key_pressed(key)
+                    {
+                        return false;
+                    }
+
+                    self.static_world.key_states.insert(key, input.state);
                 }
             }
             glutin::event::WindowEvent::Resized(size) => unsafe {
@@ -433,6 +427,7 @@ impl World {
             },
             _ => (),
         }
+        true
     }
 
     pub fn add_gui<T>(&mut self, gui_builder: T)
@@ -446,9 +441,7 @@ impl World {
             &mut self.static_world,
         );
 
-        let id = self.add_system(gui_context);
-
-        self.make_system_ui_aware(id);
+        self.add_system(gui_context);
     }
 }
 

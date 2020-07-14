@@ -718,6 +718,23 @@ impl LinearBar {
         (self.value - self.minimum) / (self.maximum - self.minimum)
     }
 
+    pub fn new_colored(
+        value: f32,
+        min: f32,
+        max: f32,
+        color: Vec4,
+        callback: GuiCallback<LinearBar>,
+    ) -> LinearBar {
+        LinearBar {
+            value,
+            minimum: min,
+            maximum: max,
+            background: ButtonBckg::Fill(color),
+            callback,
+            ..Default::default()
+        }
+    }
+
     fn update_value(&mut self, curosr_x: f32) {
         let ratio = curosr_x / self.size().x;
         let ratio = if ratio < 0.0 {
