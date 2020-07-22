@@ -10,6 +10,9 @@ path = "src/lib.rs"
 name = "glui"
 path = "src/bin.rs"
 
+[features]
+serializable = ["serde", "serde_json"]
+
 [dependencies]
 glutin = "0.24.0"
 num = "0.2.1"
@@ -25,3 +28,5 @@ prettytable-rs = "*"
 bimap = "*"
 match-downcast = "0.1.2"
 maplit = "*"
+serde = {version = "*", features = ["derive"], optional = true}
+serde_json = {version = "*", optional = true}

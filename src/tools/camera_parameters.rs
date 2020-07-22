@@ -1,12 +1,22 @@
+#[cfg(feature = "serializable")]
+extern crate serde;
+
+#[cfg(feature = "serializable")]
+use self::serde::Deserialize;
+#[cfg(feature = "serializable")]
+use self::serde::Serialize;
+
 use std::f32::consts::PI;
 use tools::{Mat4, Vec3, Vec4};
 
+#[cfg_attr(feature = "serializable", derive(Serialize, Deserialize))]
 #[derive(Debug, Copy, Clone)]
 pub enum Projection {
     Perspective,
     Orthogonal,
 }
 
+#[cfg_attr(feature = "serializable", derive(Serialize, Deserialize))]
 #[derive(Debug, Copy, Clone)]
 pub struct CameraSpatialParams {
     pub pos: Vec3,
@@ -145,6 +155,7 @@ impl CameraSpatialParams {
     }
 }
 
+#[cfg_attr(feature = "serializable", derive(Serialize, Deserialize))]
 #[derive(Debug, Copy, Clone)]
 pub struct CameraParameters {
     pub spatial: CameraSpatialParams,

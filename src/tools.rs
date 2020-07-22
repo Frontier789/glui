@@ -65,6 +65,7 @@ pub mod matrix4;
 pub mod mesh;
 pub mod profiler;
 pub mod rect;
+pub mod serde_tools;
 pub mod shader;
 pub mod shader_error;
 pub mod texture;

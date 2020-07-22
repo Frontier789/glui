@@ -108,6 +108,10 @@ impl VertexArray {
         }
     }
 
+    pub fn max_vertices(&self) -> usize {
+        self.max_vertices
+    }
+
     pub fn render(&self, instances: usize, mode: DrawMode) {
         if self.max_vertices == 0 {
             return;

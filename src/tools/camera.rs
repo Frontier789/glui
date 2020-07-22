@@ -51,16 +51,20 @@ impl Camera {
     where
         C: CameraController,
     {
+        let mut params = CameraParameters {
+            spatial: Default::default(),
+            projection: Projection::Perspective,
+            fov: std::f32::consts::PI * 100.0 / 180.0,
+            texel_scale: 1.0,
+            znear: 0.1,
+            zfar: 1000.0,
+        };
+
+        controller.init(&mut params);
+
         Camera {
             fbo: None,
-            params: CameraParameters {
-                spatial: Default::default(),
-                projection: Projection::Perspective,
-                fov: std::f32::consts::PI * 100.0 / 180.0,
-                texel_scale: 1.0,
-                znear: 0.1,
-                zfar: 1000.0,
-            },
+            params,
             controller: Box::new(controller),
         }
     }

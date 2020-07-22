@@ -237,7 +237,7 @@ impl World {
             }
         }
     }
-    pub fn run(mut self) {
+    pub fn run(&mut self) {
         if self.running {
             return;
         }
@@ -276,7 +276,7 @@ impl World {
 
         updates_running_clone
     }
-    fn owned_msg_loop(mut self) {
+    fn owned_msg_loop(&mut self) {
         let mut loop_data = MessageLoopData::Consumed;
         std::mem::swap(&mut loop_data, &mut self.loop_data);
         if let MessageLoopData::HandRolled(HandrolledMsgLoopData {
@@ -317,7 +317,7 @@ impl World {
         }
         false
     }
-    fn glutin_cont_msg_loop(mut self) {
+    fn glutin_cont_msg_loop(&mut self) {
         let mut loop_data = MessageLoopData::Consumed;
         std::mem::swap(&mut loop_data, &mut self.loop_data);
 
@@ -346,7 +346,7 @@ impl World {
         }
     }
 
-    fn glutin_win_msg_loop(mut self) {
+    fn glutin_win_msg_loop(&mut self) {
         let mut loop_data = MessageLoopData::Consumed;
         std::mem::swap(&mut loop_data, &mut self.loop_data);
         if let MessageLoopData::GlutinWindowed(data) = loop_data {

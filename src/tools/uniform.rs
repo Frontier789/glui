@@ -1,4 +1,4 @@
-use tools::{Mat4, Vec2, Vec3, Vec4};
+use tools::{Mat4, Vec2, Vec3, Vec4, RgbaTexture, Texture};
 
 #[derive(Debug, Clone)]
 pub enum Uniform {
@@ -50,5 +50,11 @@ impl UniformCompatible for Vec4 {
 impl UniformCompatible for Mat4 {
     fn into_uniform(self, name: &str) -> Uniform {
         Uniform::Matrix4(name.to_string(), self)
+    }
+}
+
+impl UniformCompatible for &RgbaTexture {
+    fn into_uniform(self, name: &str) -> Uniform {
+        Uniform::Texture2D(name.to_string(), self.id())
     }
 }
