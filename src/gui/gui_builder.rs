@@ -123,4 +123,7 @@ pub trait GuiBuilder: Clone + PartialEq + Debug {
 
     fn receive(&mut self, _msg: &Box<dyn Message>, _world: &mut StaticWorld) {}
     fn update(&mut self, _delta_time: Duration, _world: &mut StaticWorld) {}
+
+    fn persist(&self, _world: &mut StaticWorld) {}
+    fn restore(&mut self, _world: &mut StaticWorld) {}
 }

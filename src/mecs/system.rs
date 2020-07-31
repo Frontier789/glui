@@ -50,6 +50,7 @@ pub trait System: Downcast {
             GlutinEvent::DeviceEvent(e) => self.device_event(e, world),
         }
     }
+    fn detach(&mut self, _world: &mut StaticWorld) {}
 }
 
 impl_downcast!(System);

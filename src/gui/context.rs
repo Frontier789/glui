@@ -88,6 +88,9 @@ where
 
         handled
     }
+    fn detach(&mut self, world: &mut StaticWorld) {
+        self.gui_builder_new.persist(world);
+    }
 }
 
 impl<D> GuiContext<D>
@@ -97,9 +100,11 @@ where
     pub fn new(
         target: WindowInfo,
         profile: bool,
-        gui_builder: D,
+        mut gui_builder: D,
         world: &mut StaticWorld,
     ) -> GuiContext<D> {
+        gui_builder.restore(world);
+
         let mut gui_context = GuiContext {
             widgets: vec![],
             parents: vec![],
@@ -189,6 +194,7 @@ where
             }
             EventResponse::HandledRebuild => {
                 self.build_dirty = true;
+                self.render_dirty = true;
             }
             EventResponse::Handled => {}
             EventResponse::Pass => {}
@@ -271,22 +277,23 @@ where
             self.widgets[id].on_cursor_leave(&mut (&mut self.gui_builder_new, world).into());
         self.handle_event_response(response);
     }
-    fn fire_move_event(&mut self, id: usize, pos: Vec2px, world: &mut StaticWorld) {
+    fn fire_move_event(&mut self, id: usize, pos: Vec2px, world: &mut StaticWorld) -> bool {
         let widget_pos = self.positions[id].pos;
         let response = self.widgets[id].on_cursor_move(
             pos - widget_pos,
             &mut (&mut self.gui_builder_new, world).into(),
         );
         self.handle_event_response(response);
+        response != EventResponse::Pass
     }
     pub fn cursor_moved(&mut self, p: Vec2px, world: &mut StaticWorld) -> bool {
         self.cursor_pos = p;
         if !self.cursor_grabbed {
             self.rebuild_cursor_inside(world);
-            false
-        } else if let Some(i) = self.cursor_hierarchy {
-            self.fire_move_event(i, p, world);
-            true
+        }
+
+        if let Some(i) = self.cursor_hierarchy {
+            self.fire_move_event(i, p, world)
         } else {
             false
         }

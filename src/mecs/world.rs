@@ -95,35 +95,34 @@ impl World {
 
     pub fn new() -> World {
         let (sender, receiver) = channel();
-        World {
-            loop_data: MessageLoopData::HandRolled(HandrolledMsgLoopData {
-                sender,
-                receiver,
-                update_interval: Self::default_update_interval(),
-            }),
-            ..Default::default()
-        }
+        let mut w = World::default();
+        w.loop_data = MessageLoopData::HandRolled(HandrolledMsgLoopData {
+            sender,
+            receiver,
+            update_interval: Self::default_update_interval(),
+        });
+
+        w
     }
     pub fn new_win(size: Vec2, title: &str, bgcolor: Vec3) -> World {
-        World {
-            loop_data: MessageLoopData::GlutinWindowed(GlutinWindowData::new(
-                size,
-                title,
-                bgcolor,
-                Self::default_update_interval(),
-            )),
-            render_pipeline: Box::new(DefaultPipeline { bgcolor }),
-            ..Default::default()
-        }
+        let mut w = World::default();
+        w.loop_data = MessageLoopData::GlutinWindowed(GlutinWindowData::new(
+            size,
+            title,
+            bgcolor,
+            Self::default_update_interval(),
+        ));
+        w.render_pipeline = Box::new(DefaultPipeline { bgcolor });
+        w
     }
     pub fn new_winless(bgcolor: Vec3) -> Result<World, glutin::CreationError> {
-        Ok(World {
-            loop_data: MessageLoopData::GlutinWindowless(GlutinContextData::new(
-                bgcolor,
-                Self::default_update_interval(),
-            )?),
-            ..Default::default()
-        })
+        let mut w = World::default();
+        w.loop_data = MessageLoopData::GlutinWindowless(GlutinContextData::new(
+            bgcolor,
+            Self::default_update_interval(),
+        )?);
+
+        Ok(w)
     }
     pub fn window_info(&self) -> Option<WindowInfo> {
         match &self.loop_data {
@@ -442,6 +441,14 @@ impl World {
         );
 
         self.add_system(gui_context);
+    }
+}
+
+impl Drop for World {
+    fn drop(&mut self) {
+        for (_id, sys) in self.systems.all_systems_mut() {
+            sys.detach(&mut self.static_world);
+        }
     }
 }
 

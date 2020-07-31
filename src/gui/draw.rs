@@ -147,6 +147,19 @@ impl<'a> DrawBuilder<'a> {
             mode: DrawMode::Triangles,
         })
     }
+    pub fn add_tex(&mut self, pos_mid: Vec2px, tex_name: &str, clr: Vec4, scale: f32) {
+        let s = self
+            .draw_resources
+            .texture_size(tex_name)
+            .unwrap_or_default();
+
+        self.add_tex_rect(
+            Rect::from_pos_size(pos_mid.to_pixels(1.0) - s / 2.0 * scale, s * scale),
+            Rect::unit(),
+            tex_name,
+            clr,
+        )
+    }
     pub fn add_tex_rect(&mut self, place_rct: Rect, cutout_rect: Rect, tex_name: &str, clr: Vec4) {
         if tex_name.is_empty() || clr.w == 0.0 {
             return;
@@ -225,7 +238,7 @@ impl<'a> DrawBuilder<'a> {
         render_seq.add_buffer(cbuf.into_base_type());
 
         let mut uniforms = vec![];
-        
+
         let shader;
         if let (Some(tex), Some(_)) = (&self.objects[beg].tex, &self.objects[beg].tpt) {
             let tpt: Vec<Vec2> = self.objects[beg..end]

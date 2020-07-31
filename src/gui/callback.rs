@@ -44,7 +44,7 @@ pub struct CallbackExecutor<'a> {
 }
 
 impl<'a> CallbackExecutor<'a> {
-    pub(crate) fn execute<S>(&mut self, cb: &GuiCallback<S>, instance: &S)
+    pub fn execute<S>(&mut self, cb: &GuiCallback<S>, instance: &S)
     where
         S: Widget + 'static,
     {
