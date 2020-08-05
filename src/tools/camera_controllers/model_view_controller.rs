@@ -3,6 +3,7 @@ use mecs::{
     GlutinWindowEvent,
 };
 use std::collections::HashMap;
+use std::f32::consts::PI;
 use tools::{CameraController, CameraParameters, CameraSpatialParams, Vec2};
 
 #[derive(Debug)]
@@ -14,6 +15,7 @@ pub struct ModelViewController {
     drag_offset: Vec2,
     rotation_direction: Option<Vec2>,
     pub disable_roll: bool,
+    pub enable_upside_down: bool,
 }
 
 impl CameraController for ModelViewController {
@@ -101,15 +103,28 @@ impl CameraController for ModelViewController {
 
                     if self.rotation_direction != None || !self.is_key_pressed(GlutinKey::LControl)
                     {
+                        let pitch = self.real_spatial.pitch();
+                        let delta_y = if !self.enable_upside_down
+                            && -delta.y * 0.01 + pitch < -PI / 2.0 * 0.99
+                        {
+                            PI / 2.0 * 0.99 + pitch
+                        } else if !self.enable_upside_down
+                            && -delta.y * 0.01 + pitch > PI / 2.0 * 0.99
+                        {
+                            -PI / 2.0 * 0.99 + pitch
+                        } else {
+                            delta.y * 0.01
+                        };
+
                         let d = self.real_spatial.target_to_pos();
                         let d = d.rotate(self.real_spatial.u(), delta.x * 0.01);
-                        let d = d.rotate(self.real_spatial.r(), delta.y * 0.01);
+                        let d = d.rotate(self.real_spatial.r(), delta_y);
 
                         self.real_spatial.set_pos(self.real_spatial.target + d);
                     }
 
                     if self.disable_roll {
-                        self.real_spatial.cancel_roll(true);
+                        self.real_spatial.cancel_roll(self.enable_upside_down);
                     }
                 }
                 if right && !left {
@@ -182,6 +197,7 @@ impl ModelViewController {
             drag_offset: Vec2::zero(),
             rotation_direction: None,
             disable_roll: false,
+            enable_upside_down: false,
         }
     }
 }

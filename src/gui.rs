@@ -19,6 +19,8 @@ pub use self::elements::Lines;
 pub use self::elements::Overlay;
 pub use self::elements::Padding;
 pub use self::elements::PanelDirection;
+pub use self::elements::SkipCell;
+pub use self::elements::SplineEditor;
 pub use self::elements::Square;
 pub use self::elements::Text;
 pub use self::elements::VertLayout;

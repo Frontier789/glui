@@ -262,6 +262,7 @@ impl<'a> DrawBuilder<'a> {
             uniforms,
             transparent: self.objects[beg].transparent,
             instances: 1,
+            wireframe: false,
         });
     }
 

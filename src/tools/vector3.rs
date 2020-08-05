@@ -4,9 +4,7 @@ extern crate num;
 extern crate serde;
 
 #[cfg(feature = "serializable")]
-use self::serde::Deserialize;
-#[cfg(feature = "serializable")]
-use self::serde::Serialize;
+use self::serde::{Deserialize, Serialize};
 
 use self::num::Float;
 use super::vector2::Vec2;
@@ -75,6 +73,10 @@ impl Vec3 {
             y: len * cp * Float::sin(theta),
             z: len * Float::sin(phi),
         }
+    }
+
+    pub fn perp_y(self) -> Vec3 {
+        Vec3::new(self.z, self.y, -self.x)
     }
 
     pub fn proj_to_perp(self, n: Vec3) -> Vec3 {

@@ -415,14 +415,12 @@ impl MeshOnGPU {
         vao.set_indices_buffer(&self.indices);
         render_seq.add_index_buffer(self.indices);
 
-        render_seq.add_command(RenderCommand {
+        render_seq.add_command(RenderCommand::new_uniforms(
             vao,
-            mode: DrawMode::Triangles,
+            DrawMode::Triangles,
             shader,
             uniforms,
-            transparent: false,
-            instances: 1,
-        });
+        ));
 
         render_seq
     }
@@ -442,14 +440,12 @@ impl MeshOnGPU {
 
         vao.set_indices_buffer(&self.indices);
 
-        render_seq.add_command(RenderCommand {
+        render_seq.add_command(RenderCommand::new_uniforms(
             vao,
-            mode: DrawMode::Triangles,
+            DrawMode::Triangles,
             shader,
             uniforms,
-            transparent: false,
-            instances: 1,
-        });
+        ));
 
         render_seq
     }

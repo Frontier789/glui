@@ -92,6 +92,17 @@ impl CameraSpatialParams {
         let v = self.v();
         v.y.asin()
     }
+    pub fn add_pitch(&mut self, delta: f32) {
+        let r = self.r();
+        let v = self.target - self.pos;
+        let u = self.u();
+        let m = Mat4::rotate(r, -delta);
+
+        let v = (m * Vec4::from_vec3(v, 0.0)).xyz();
+        let u = (m * Vec4::from_vec3(u, 0.0)).xyz();
+        self.pos = self.target - v;
+        self.up = u;
+    }
     pub fn cos_pitch(&self) -> f32 {
         let v = self.v();
         1.0 - v.y * v.y

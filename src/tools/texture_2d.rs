@@ -9,6 +9,8 @@ use super::Vec2;
 use tools::texture::alignment_from_format_u8;
 use tools::Texture;
 
+pub type ImageError = image::ImageError;
+
 #[derive(Debug)]
 pub struct RgbaTexture {
     id: u32,

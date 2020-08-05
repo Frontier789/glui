@@ -206,7 +206,7 @@ const DIF_VERT_SOURCE: &'static str = "#version 420 core
     }";
 const DIF_FRAG_SOURCE: &'static str = "#version 420 core
     
-    uniform vec3 L = normalize(vec3(1,1,1));
+    uniform vec3 light_direction = normalize(vec3(1,1,1));
     
     in vec3 va_nrm;
     
@@ -214,6 +214,6 @@ const DIF_FRAG_SOURCE: &'static str = "#version 420 core
     
     void main()
     {
-        float d = dot(normalize(va_nrm), L);
+        float d = dot(normalize(va_nrm), light_direction);
         color = vec4(vec3(max(d,0) + 0.1), 1);
     }";

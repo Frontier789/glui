@@ -11,9 +11,37 @@ pub struct RenderCommand {
     pub uniforms: Vec<Uniform>,
     pub transparent: bool,
     pub instances: usize,
+    pub wireframe: bool,
 }
 
 impl RenderCommand {
+    pub fn new(vao: VertexArray, mode: DrawMode, shader: DrawShaderSelector) -> RenderCommand {
+        RenderCommand {
+            vao,
+            mode,
+            shader,
+            uniforms: vec![],
+            transparent: false,
+            instances: 1,
+            wireframe: false,
+        }
+    }
+    pub fn new_uniforms(
+        vao: VertexArray,
+        mode: DrawMode,
+        shader: DrawShaderSelector,
+        uniforms: Vec<Uniform>,
+    ) -> RenderCommand {
+        RenderCommand {
+            vao,
+            mode,
+            shader,
+            uniforms,
+            transparent: false,
+            instances: 1,
+            wireframe: false,
+        }
+    }
     fn apply_blend(&self) {
         unsafe {
             if self.transparent {
@@ -21,6 +49,15 @@ impl RenderCommand {
                 gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
             } else {
                 gl::Disable(gl::BLEND);
+            }
+        }
+    }
+    fn apply_wireframe(&self) {
+        unsafe {
+            if self.wireframe {
+                gl::PolygonMode(gl::FRONT, gl::LINE);
+            } else {
+                gl::PolygonMode(gl::FRONT, gl::FILL);
             }
         }
     }
@@ -52,9 +89,13 @@ impl RenderCommand {
             if self.shader != previous.shader {
                 self.bind_shader(draw_resources);
             }
+            if self.wireframe != previous.wireframe {
+                self.apply_wireframe();
+            }
         } else {
             self.apply_blend();
             self.bind_shader(draw_resources);
+            self.apply_wireframe();
         }
 
         let shader = draw_resources.get_shader(&self.shader);

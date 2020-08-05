@@ -1,8 +1,16 @@
 extern crate num;
 
+#[cfg(feature = "serializable")]
+extern crate serde;
+
+#[cfg(feature = "serializable")]
+use self::serde::{Deserialize, Serialize};
+
 use self::num::Float;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
+#[repr(C)]
+#[cfg_attr(feature = "serializable", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
 pub struct Vec2 {
     pub x: f32,

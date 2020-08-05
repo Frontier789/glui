@@ -42,6 +42,12 @@ impl RenderSequence {
     pub fn command_mut(&mut self, index: usize) -> &mut RenderCommand {
         &mut self.commands[index]
     }
+    pub fn command_iter(&self) -> impl Iterator<Item = &RenderCommand> {
+        self.commands.iter()
+    }
+    pub fn command_iter_mut(&mut self) -> impl Iterator<Item = &mut RenderCommand> {
+        self.commands.iter_mut()
+    }
     pub fn add_command(&mut self, cmd: RenderCommand) {
         self.commands.push(cmd);
     }
