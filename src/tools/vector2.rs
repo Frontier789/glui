@@ -41,10 +41,21 @@ impl Vec2 {
         Self { x: xy, y: xy }
     }
 
+    pub fn from_array(xy: [f32; 2]) -> Self {
+        Self { x: xy[0], y: xy[1] }
+    }
+
     pub fn pol(len: f32, angle: f32) -> Self {
         Self {
             x: len * Float::cos(angle),
             y: len * Float::sin(angle),
+        }
+    }
+
+    pub fn yx(self) -> Self {
+        Self {
+            x: self.y,
+            y: self.x,
         }
     }
 
@@ -144,6 +155,20 @@ impl Vec2 {
 
     pub fn aspect(self) -> f32 {
         self.x / self.y
+    }
+
+    pub fn eval_bezier4(p0: Vec2, p1: Vec2, p2: Vec2, p3: Vec2, t: f32) -> (Vec2, Vec2, Vec2) {
+        let p = (1.0 - t) * (1.0 - t) * (1.0 - t) * p0
+            + 3.0 * t * (1.0 - t) * (1.0 - t) * p1
+            + 3.0 * t * t * (1.0 - t) * p2
+            + t * t * t * p3;
+        let v = -3.0 * (1.0 - t) * (1.0 - t) * p0
+            + 3.0 * (3.0 * t * t - 4.0 * t + 1.0) * p1
+            + 3.0 * (2.0 - 3.0 * t) * t * p2
+            + 3.0 * t * t * p3;
+        let n = v.perp().sgn();
+
+        (p, v, n)
     }
 }
 

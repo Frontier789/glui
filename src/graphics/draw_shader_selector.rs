@@ -1,11 +1,12 @@
 use tools::DrawShader;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum DrawShaderSelector {
     UniformColored,
     Colored,
     Textured,
     DiffusePhong,
+    Phong,
     Custom(DrawShader),
 }
 

@@ -75,6 +75,8 @@ impl RenderCommand {
         );
         shader.set_uniform("model", draw_resources.model_matrix);
         shader.set_uniform("MVP", draw_resources.MVP());
+        shader.set_uniform("MV", draw_resources.MV());
+        shader.set_uniform("VP", draw_resources.VP());
         shader.set_uniform("normal_MV", draw_resources.normal_matrix_MV());
         shader.set_uniform("normal_model", draw_resources.normal_matrix_model());
         shader.set_uniform("time", draw_resources.clock.elapsed().as_secs_f32());

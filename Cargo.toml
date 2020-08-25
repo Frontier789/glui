@@ -30,3 +30,4 @@ match-downcast = "0.1.2"
 maplit = "*"
 serde = {version = "*", features = ["derive"], optional = true}
 serde_json = {version = "*", optional = true}
+rand = "*"

@@ -126,6 +126,22 @@ impl StaticWorld {
         }
         entity
     }
+    pub fn entities_having_component<C>(&self) -> Vec<Entity>
+    where
+        C: Component,
+    {
+        let me = &*self;
+        me.entities
+            .iter()
+            .filter_map(|(&entity, _)| {
+                if me.has_component::<C>(entity) {
+                    Some(entity)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
     pub fn entities_with_component<C>(&self) -> Vec<(Entity, &C)>
     where
         C: Component,

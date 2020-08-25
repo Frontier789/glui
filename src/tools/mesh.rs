@@ -24,8 +24,8 @@ pub fn parsurf_indices(N: usize, M: usize) -> Vec<u32> {
     let mut indices = Vec::with_capacity((N * (M - 1) * 2 + (M - 2)) as usize);
     for j in 0..M - 1 {
         for i in 0..N {
-            indices.push(i + j * N);
             indices.push(i + j * N + N);
+            indices.push(i + j * N);
         }
         if j + 2 < M {
             indices.push(core::u32::MAX);
@@ -129,6 +129,7 @@ pub fn parsurf_triangles<T, F: Fn(f32, f32) -> T>(surf: F, N: usize, M: usize) -
     pts
 }
 
+#[derive(Copy, Clone, Debug)]
 #[repr(C)]
 pub struct MeshFace {
     a: u32,
@@ -182,9 +183,11 @@ impl MeshFace {
     }
 }
 
+#[derive(Clone)]
 pub struct Mesh {
     pub points: Vec<Vec3>,
     pub normals: Option<Vec<Vec3>>,
+    pub uvcoords: Option<Vec<Vec2>>,
     pub faces: Vec<MeshFace>,
 }
 
@@ -240,6 +243,7 @@ impl Mesh {
             points: rect.corners_3d(),
             normals: Some(vec![Vec3::new(0.0, 0.0, 1.0); 4]),
             faces: vec![(0, 1, 2).into(), (0, 2, 3).into()],
+            uvcoords: Some(Rect::unit().corners()),
         }
     }
 
@@ -268,6 +272,7 @@ impl Mesh {
             points: pts,
             normals: Some(nrms),
             faces: MeshFace::from_vec(parsurf_indices_triangulated(N, M)),
+            uvcoords: Some(parsurf(|x, y| Vec2::new(x, y), N, M)),
         }
     }
 
@@ -329,6 +334,7 @@ impl Mesh {
             points: pts,
             normals: None,
             faces: MeshFace::from_vec(faces),
+            uvcoords: None,
         };
         m.generate_flat_normals();
         m
@@ -367,9 +373,18 @@ impl Mesh {
                 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15,
                 16, 17, 18, 16, 18, 19, 20, 21, 22, 20, 22, 23,
             ]),
+            uvcoords: None, // TODO
         };
         m.generate_flat_normals();
         m
+    }
+    pub fn new() -> Mesh {
+        Mesh {
+            points: vec![],
+            normals: None,
+            faces: MeshFace::from_vec(vec![]),
+            uvcoords: None,
+        }
     }
 
     pub fn generate_flat_normals(&mut self) {
@@ -386,6 +401,51 @@ impl Mesh {
         }
 
         self.normals = Some(normals)
+    }
+
+    pub fn aabb(&self) -> (Vec3, Vec3) {
+        let p0 = self.points[0];
+
+        let mn = self.points.iter().fold(p0, |p, q| {
+            Vec3::new(p.x.min(q.x), p.y.min(q.y), p.z.min(q.z))
+        });
+        let mx = self.points.iter().fold(p0, |p, q| {
+            Vec3::new(p.x.max(q.x), p.y.max(q.y), p.z.max(q.z))
+        });
+
+        (mn, mx)
+    }
+
+    pub fn fit_into_aabb_into_unit_cube(mut self, aabb: (Vec3, Vec3)) -> Mesh {
+        let (mn, mx) = aabb;
+
+        let span = mx - mn;
+        for p in self.points.iter_mut() {
+            *p = (*p - mn) / span * 2.0 - Vec3::new(1.0, 1.0, 1.0);
+        }
+
+        self
+    }
+
+    pub fn extend_aabb(&self, aabb: (Vec3, Vec3)) -> (Vec3, Vec3) {
+        let maabb = self.aabb();
+        (
+            Vec3::new(
+                aabb.0.x.min(maabb.0.x),
+                aabb.0.y.min(maabb.0.y),
+                aabb.0.z.min(maabb.0.z),
+            ),
+            Vec3::new(
+                aabb.1.x.max(maabb.1.x),
+                aabb.1.y.max(maabb.1.y),
+                aabb.1.z.max(maabb.1.z),
+            ),
+        )
+    }
+
+    pub fn fit_into_unit_cube(self) -> Mesh {
+        let aabb = self.aabb();
+        self.fit_into_aabb_into_unit_cube(aabb)
     }
 }
 
@@ -448,5 +508,22 @@ impl MeshOnGPU {
         ));
 
         render_seq
+    }
+    pub fn as_render_command(
+        &self,
+        shader: DrawShaderSelector,
+        uniforms: Vec<Uniform>,
+    ) -> RenderCommand {
+        let mut vao = VertexArray::new();
+
+        vao.attrib_buffer(0, &self.points);
+
+        if let Some(nbuf) = &self.normals {
+            vao.attrib_buffer(3, &nbuf);
+        }
+
+        vao.set_indices_buffer(&self.indices);
+
+        RenderCommand::new_uniforms(vao, DrawMode::Triangles, shader, uniforms)
     }
 }

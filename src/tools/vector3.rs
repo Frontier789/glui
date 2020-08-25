@@ -143,6 +143,13 @@ impl Vec3 {
             z: self.y,
         }
     }
+
+    pub fn xy(self) -> Vec2 {
+        Vec2 {
+            x: self.x,
+            y: self.y,
+        }
+    }
     pub fn unsign(self) -> Vec3 {
         Vec3 {
             x: self.x.abs(),

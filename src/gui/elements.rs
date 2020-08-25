@@ -759,6 +759,7 @@ pub struct Image {
     pub size: WidgetSize,
     pub name: String,
     pub cutout: Rect,
+    pub rotation: f32,
     pub private: ImagePrivate,
 }
 
@@ -769,11 +770,12 @@ impl Widget for Image {
     }
     fn on_draw_build(&self, builder: &mut DrawBuilder) {
         let size = self.size().to_pixels(1.0);
-        builder.add_tex_rect(
+        builder.add_tex_rect_rot(
             Rect::from_min_max(Vec2::origin(), size),
             self.cutout,
             &self.name,
             Vec4::WHITE,
+            self.rotation,
         );
     }
     fn size(&self) -> Vec2px {

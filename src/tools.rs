@@ -38,6 +38,7 @@ pub use self::shader::DrawShader;
 pub use self::shader_error::ShaderCompileError;
 pub use self::spline::Spline;
 pub use self::texture::Texture;
+pub use self::texture_2d::FloatTexture;
 pub use self::texture_2d::RgbaTexture;
 pub use self::uniform::Uniform;
 pub use self::vao::VertexArray;

@@ -12,6 +12,7 @@ pub struct DefaultDrawShaders {
     pub diffuse_phong: DrawShader,
     pub colored: DrawShader,
     pub textured: DrawShader,
+    pub phong: DrawShader,
 }
 
 pub struct DrawResources {
@@ -53,6 +54,7 @@ impl DrawResources {
             DrawShaderSelector::Colored => &self.shaders.colored,
             DrawShaderSelector::Textured => &self.shaders.textured,
             DrawShaderSelector::DiffusePhong => &self.shaders.diffuse_phong,
+            DrawShaderSelector::Phong => &self.shaders.phong,
             DrawShaderSelector::Custom(shader) => shader,
         }
     }
@@ -85,18 +87,30 @@ impl DrawResources {
         let uni_col_shader = DrawShader::compile(UNI_COL_VERT_SOURCE, UNI_COL_FRAG_SOURCE)?;
         let tex_shader = DrawShader::compile(TEX_VERT_SOURCE, TEX_FRAG_SOURCE)?;
         let dif_shader = DrawShader::compile(DIF_VERT_SOURCE, DIF_FRAG_SOURCE)?;
+        let phong_shader = DrawShader::compile(PHONG_VERT_SOURCE, PHONG_FRAG_SOURCE)?;
 
         Ok(DefaultDrawShaders {
             uniform_color: uni_col_shader,
             colored: col_shader,
             textured: tex_shader,
             diffuse_phong: dif_shader,
+            phong: phong_shader,
         })
     }
 
     #[allow(non_snake_case)]
     pub fn MVP(&self) -> Mat4 {
         self.projection_matrix * self.view_matrix * self.model_matrix
+    }
+
+    #[allow(non_snake_case)]
+    pub fn MV(&self) -> Mat4 {
+        self.view_matrix * self.model_matrix
+    }
+
+    #[allow(non_snake_case)]
+    pub fn VP(&self) -> Mat4 {
+        self.projection_matrix * self.view_matrix
     }
 
     #[allow(non_snake_case)]
@@ -216,4 +230,50 @@ const DIF_FRAG_SOURCE: &'static str = "#version 420 core
     {
         float d = dot(normalize(va_nrm), light_direction);
         color = vec4(vec3(max(d,0) + 0.1), 1);
+    }";
+
+const PHONG_VERT_SOURCE: &'static str = "#version 420 core
+    
+    layout(location = 0) in vec3 pos;
+    layout(location = 3) in vec3 nrm;
+    
+    uniform mat4 model;
+    uniform mat4 MVP;
+    uniform mat4 normal_model;
+    
+    out vec3 va_nrm;
+    out vec3 va_pos;
+    
+    void main()
+    {
+        gl_Position = MVP * vec4(pos, 1);
+        
+        va_nrm = vec3(normal_model * vec4(nrm, 0));
+        va_pos = vec3(model * vec4(pos, 1));
+    }";
+const PHONG_FRAG_SOURCE: &'static str = "#version 420 core
+    
+    uniform vec3 light_direction = normalize(vec3(1,1,1));
+    uniform vec3 cam_pos;
+    uniform vec3 Ka = vec3(0.1);
+    uniform vec3 Kd = vec3(1.0);
+    uniform vec3 Ks = vec3(0.2);
+    uniform float Ns = 9.0;
+
+    in vec3 va_nrm;
+    in vec3 va_pos;
+    
+    out vec4 color;
+    
+    void main()
+    {
+        vec3 n = normalize(va_nrm);
+
+        vec3 V = normalize(cam_pos - va_pos);
+        vec3 R = reflect( -light_direction, n);
+        vec3 specular = Ks * pow(max(dot(V, R), 0.0), Ns);
+
+        vec3 diffuse = max(dot(n,light_direction),0) * Kd;
+
+        color = vec4(Ka + diffuse + specular,1);
     }";

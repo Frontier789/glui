@@ -177,6 +177,35 @@ impl<'a> DrawBuilder<'a> {
             mode: DrawMode::Triangles,
         })
     }
+    pub fn add_tex_rect_rot(
+        &mut self,
+        place_rct: Rect,
+        cutout_rect: Rect,
+        tex_name: &str,
+        clr: Vec4,
+        rot: f32,
+    ) {
+        if tex_name.is_empty() || clr.w == 0.0 {
+            return;
+        }
+
+        let mut pts = offset((place_rct * self.gui_scale()).triangulate_3d(), self.offset);
+        let mid = (pts[0] + pts[1] + pts[2] + pts[5]) / 4.0;
+        let r = Mat4::rotate_z(rot);
+        for p in pts.iter_mut() {
+            *p = (r * Vec4::from_vec3(*p - mid, 0.0)).xyz() + mid;
+        }
+
+        self.objects.push(DrawObject {
+            pts,
+            clr: DrawColor::Const(clr),
+            tpt: Some(cutout_rect.triangulate()),
+            tex: self.draw_resources.texture_id(tex_name),
+            transparent: true,
+            depth: self.offset.z,
+            mode: DrawMode::Triangles,
+        })
+    }
     pub fn add_text(
         &mut self,
         text: &str,

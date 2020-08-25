@@ -74,6 +74,15 @@ impl Vec4 {
     pub fn xyz(self) -> Vec3 {
         Vec3::new(self.x, self.y, self.z)
     }
+    pub fn xzyw(self) -> Vec4 {
+        Vec4::new(self.x, self.z, self.y, self.w)
+    }
+    pub fn zxyw(self) -> Vec4 {
+        Vec4::new(self.z, self.x, self.y, self.w)
+    }
+    pub fn yzxw(self) -> Vec4 {
+        Vec4::new(self.y, self.z, self.x, self.w)
+    }
 
     pub fn dot(self, v: Vec4) -> f32 {
         self.x * v.x + self.y * v.y + self.z * v.z
