@@ -88,6 +88,14 @@ impl Rect {
             bottom: self.bottom + o.y,
         }
     }
+    pub fn scale(self, s: Vec2) -> Rect {
+        Rect {
+            left: self.left * s.x,
+            top: self.top * s.y,
+            right: self.right * s.x,
+            bottom: self.bottom * s.y,
+        }
+    }
 
     pub fn triangulate(self) -> Vec<Vec2> {
         vec![

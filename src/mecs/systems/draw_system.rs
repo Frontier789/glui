@@ -4,7 +4,7 @@ use mecs::{
     StaticWorld, System, World,
 };
 use std::time::Duration;
-use tools::{Camera, CameraController, Vec2, Vec3, Vec4};
+use tools::{Camera, CameraController, Vec2, Vec4};
 
 pub struct DrawSystem {
     pub camera_entity: Entity,
@@ -27,14 +27,17 @@ impl System for DrawSystem {
         let view_matrix = camera.data.view();
 
         for (e, c) in world.entities_with_component::<DrawComponent>() {
-            let mut center = Vec3::origin();
+            let mut depth;
+
             if let Some(body) = world.component::<BodyComponent>(e) {
-                center = body.center;
+                let center = body.center;
+                depth = -center.z;
+            } else {
+                let model_view_mat = view_matrix * c.model_matrix;
+                let center_in_view = model_view_mat * Vec4::new(0.0, 0.0, 0.0, 1.0);
+                depth = -center_in_view.z;
             }
 
-            let model_view_mat = view_matrix * c.model_matrix;
-            let center_in_view = model_view_mat * Vec4::from_vec3(center, 1.0);
-            let mut depth = -center_in_view.z;
             if !depth.is_normal() {
                 depth = 0.0;
             }

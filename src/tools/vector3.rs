@@ -199,6 +199,9 @@ impl Vec3 {
     pub fn xz(self) -> Vec2 {
         Vec2::new(self.x, self.z)
     }
+    pub fn as_array(self) -> [f32; 3] {
+        [self.x, self.y, self.z]
+    }
 }
 
 // A op B
