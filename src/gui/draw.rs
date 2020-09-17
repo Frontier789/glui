@@ -62,7 +62,9 @@ impl<'a> DrawBuilder<'a> {
             mode: DrawMode::LineStrip,
         })
     }
-    pub fn add_clr_convex(&mut self, pts: Vec<Vec2px>, clr: Vec4, n: usize, antialias: bool) {
+    pub fn add_clr_convex(&mut self, pts: Vec<Vec2px>, clr: Vec4, antialias: bool) {
+        let n = pts.len();
+        
         if !antialias {
             let pts = pts
                 .into_iter()
@@ -126,7 +128,7 @@ impl<'a> DrawBuilder<'a> {
             c
         };
 
-        let ids_fill = (1..n - 1).map(|i| vec![0, i + 1, i]).flatten();
+        let ids_fill = (1..n - 1).map(|i| vec![0, i, i + 1]).flatten();
         let ids_outline = (0..n)
             .map(|i| vec![i, (i + 1) % n, (i + 1) % n + n, i, (i + 1) % n + n, i + n])
             .flatten();
@@ -150,7 +152,7 @@ impl<'a> DrawBuilder<'a> {
     {
         let pts: Vec<Vec2px> = (0..n).map(|i| pos_fun(i as f32 / n as f32)).collect();
 
-        self.add_clr_convex(pts, clr, n, antialias);
+        self.add_clr_convex(pts, clr, antialias);
     }
     pub fn add_clr_rect(&mut self, rct: Rect, clr: Vec4) {
         if clr.w == 0.0 {
@@ -332,7 +334,7 @@ impl<'a> DrawBuilder<'a> {
         let mut i = 0;
         while i < n {
             let mut j = i + 1;
-            while j < n && cmp_dobj(&self.objects[i], &self.objects[j]) == std::cmp::Ordering::Equal
+            while j < n && cmp_dobj(&self.objects[i], &self.objects[j]) == std::cmp::Ordering::Equal && self.objects[i].mode.batchable()
             {
                 j += 1;
             }

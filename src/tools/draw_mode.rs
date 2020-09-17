@@ -17,6 +17,25 @@ pub enum DrawMode {
     Patches,
 }
 
+impl DrawMode {
+    pub fn batchable(self) -> bool {
+        match self {
+            DrawMode::Points => true,
+            DrawMode::LineStrip => false,
+            DrawMode::LineLoop => false,
+            DrawMode::Lines => true,
+            DrawMode::TriangleStrip => false,
+            DrawMode::TriangleFan => false,
+            DrawMode::Triangles => true,
+            DrawMode::LinesAdjacency => false,
+            DrawMode::LineStripAdjacency => false,
+            DrawMode::TrianglesAdjacency => false,
+            DrawMode::TriangleStripAdjacency => false,
+            DrawMode::Patches => false,
+        }
+    }
+}
+
 impl fmt::Display for DrawMode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(

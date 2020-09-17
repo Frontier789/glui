@@ -597,13 +597,13 @@ fn build_draw_for_button(
             let n = ((radius * 2.0 * PI / 4.0).ceil() * 4.0) as usize;
             let mut pts = Vec::with_capacity(n);
             let s = size / 2.0 - Vec2px::new_xy(radius);
-            let mut r0 = 0.0;
+            let mut r0 = PI / 2.0;
 
             for offset in [
                 Vec2px::new(1.0, 1.0),
-                Vec2px::new(-1.0, 1.0),
                 Vec2px::new(1.0, -1.0),
                 Vec2px::new(-1.0, -1.0),
+                Vec2px::new(-1.0, 1.0),
             ]
             .iter()
             {
@@ -611,12 +611,12 @@ fn build_draw_for_button(
 
                 for i in 0..n / 4 {
                     let t = i as f32 / (n / 4) as f32;
-                    pts.push(Vec2px::pol(radius, r0 + t * PI / 2.0) + circle_mid);
+                    pts.push(Vec2px::pol(radius, r0 - t * PI / 2.0) + circle_mid);
                 }
 
-                r0 += PI / 2.0;
+                r0 -= PI / 2.0;
             }
-            builder.add_clr_convex(pts, clr, n, false);
+            builder.add_clr_convex(pts, clr, true);
         }
         ButtonBckg::Image(name, _, _, _) => {
             builder.add_tex_rect(
