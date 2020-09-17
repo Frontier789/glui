@@ -120,7 +120,7 @@ impl Data {
                         sender.send(MessageTarget::Root, message::Exit {});
                     }
                 }),
-                background: ButtonBckg::RoundRect(Vec4::grey(0.1), 6.0),
+                background: ButtonBckg::RoundRect(Vec4::grey(0.1), 8.0),
                 ..Default::default()
             };
     }

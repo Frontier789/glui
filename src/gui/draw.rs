@@ -62,13 +62,30 @@ impl<'a> DrawBuilder<'a> {
             mode: DrawMode::LineStrip,
         })
     }
-    pub fn add_clr_convex<FP>(&mut self, pos_fun: FP, clr: Vec4, n: usize, antialias: bool)
-    where
-        FP: Fn(f32) -> Vec2px,
-    {
-        let pts: Vec<Vec2> = (0..n)
-            .map(|i| pos_fun(i as f32 / n as f32).to_pixels(self.gui_scale()))
-            .collect();
+    pub fn add_clr_convex(&mut self, pts: Vec<Vec2px>, clr: Vec4, n: usize, antialias: bool) {
+        if !antialias {
+            let pts = pts
+                .into_iter()
+                .map(|p| Vec3::from_vec2(p.to_pixels(self.gui_scale()), 0.0))
+                .collect::<Vec<Vec3>>();
+
+            self.objects.push(DrawObject {
+                pts: offset(pts, self.offset),
+                clr: DrawColor::Const(clr),
+                tpt: None,
+                tex: None,
+                transparent: clr.w < 1.0,
+                depth: self.offset.z,
+                mode: DrawMode::TriangleFan,
+            });
+            return;
+        }
+
+        let pts = pts
+            .into_iter()
+            .map(|p| p.to_pixels(self.gui_scale()))
+            .collect::<Vec<Vec2>>();
+
         let norm: Vec<Vec2> = (0..n)
             .map(|i| {
                 let a = pts[(i + n - 1) % n];
@@ -109,17 +126,12 @@ impl<'a> DrawBuilder<'a> {
             c
         };
 
-        let ids_fill = (1..n - 1).map(|i| vec![0, i, i + 1]).flatten();
+        let ids_fill = (1..n - 1).map(|i| vec![0, i + 1, i]).flatten();
         let ids_outline = (0..n)
             .map(|i| vec![i, (i + 1) % n, (i + 1) % n + n, i, (i + 1) % n + n, i + n])
             .flatten();
 
-        let ids = if antialias {
-            ids_outline.chain(ids_fill).collect::<Vec<usize>>()
-        } else {
-            ids_fill.collect::<Vec<usize>>()
-        };
-
+        let ids = ids_outline.chain(ids_fill).collect::<Vec<usize>>();
         let ids = ids.iter();
 
         self.objects.push(DrawObject {
@@ -131,6 +143,14 @@ impl<'a> DrawBuilder<'a> {
             depth: self.offset.z,
             mode: DrawMode::Triangles,
         })
+    }
+    pub fn add_clr_convex_fun<FP>(&mut self, pos_fun: FP, clr: Vec4, n: usize, antialias: bool)
+    where
+        FP: Fn(f32) -> Vec2px,
+    {
+        let pts: Vec<Vec2px> = (0..n).map(|i| pos_fun(i as f32 / n as f32)).collect();
+
+        self.add_clr_convex(pts, clr, n, antialias);
     }
     pub fn add_clr_rect(&mut self, rct: Rect, clr: Vec4) {
         if clr.w == 0.0 {

@@ -588,25 +588,35 @@ fn build_draw_for_button(
             let radius = size.minxy();
             let offset = size / 2.0;
             let cirlce = |r| Vec2px::pol(radius, r * PI * 2.0) + size / 2.0 + offset;
-            builder.add_clr_convex(cirlce, clr, (radius * 2.0 * PI).floor() as usize, true);
+            builder.add_clr_convex_fun(cirlce, clr, (radius * 2.0 * PI).floor() as usize, true);
         }
         ButtonBckg::Fill(_) => {
             builder.add_clr_rect(Rect::from_min_max(Vec2::origin(), size.as_vec2()), clr);
         }
         ButtonBckg::RoundRect(_, radius) => {
-            let round_rect = |r| {
-                let s = size / 2.0 - Vec2px::new_xy(radius);
+            let n = ((radius * 2.0 * PI / 4.0).ceil() * 4.0) as usize;
+            let mut pts = Vec::with_capacity(n);
+            let s = size / 2.0 - Vec2px::new_xy(radius);
+            let mut r0 = 0.0;
 
-                let circle_mid = size / 2.0
-                    + match r {
-                        x if x < 0.25 => s,
-                        x if x < 0.5 => s * Vec2px::new(-1.0, 1.0),
-                        x if x < 0.75 => s * Vec2px::new(-1.0, -1.0),
-                        _ => s * Vec2px::new(1.0, -1.0),
-                    };
-                Vec2px::pol(radius, r * PI * 2.0) + circle_mid
-            };
-            builder.add_clr_convex(round_rect, clr, (radius * 2.0 * PI).floor() as usize, true);
+            for offset in [
+                Vec2px::new(1.0, 1.0),
+                Vec2px::new(-1.0, 1.0),
+                Vec2px::new(1.0, -1.0),
+                Vec2px::new(-1.0, -1.0),
+            ]
+            .iter()
+            {
+                let circle_mid = size / 2.0 + s * *offset;
+
+                for i in 0..n / 4 {
+                    let t = i as f32 / (n / 4) as f32;
+                    pts.push(Vec2px::pol(radius, r0 + t * PI / 2.0) + circle_mid);
+                }
+
+                r0 += PI / 2.0;
+            }
+            builder.add_clr_convex(pts, clr, n, false);
         }
         ButtonBckg::Image(name, _, _, _) => {
             builder.add_tex_rect(
