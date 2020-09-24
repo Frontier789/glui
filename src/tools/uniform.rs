@@ -1,4 +1,4 @@
-use tools::{FloatTexture, Mat4, RgbaTexture, Texture, Vec2, Vec3, Vec4};
+use tools::{CubeTexture, FloatTexture, Mat4, RgbaTexture, Texture, Vec2, Vec3, Vec4};
 
 #[derive(Debug, Clone)]
 pub enum Uniform {
@@ -63,5 +63,11 @@ impl UniformCompatible for &RgbaTexture {
 impl UniformCompatible for &FloatTexture {
     fn into_uniform(self, name: &str) -> Uniform {
         Uniform::Texture2D(name.to_string(), self.id())
+    }
+}
+
+impl UniformCompatible for &CubeTexture {
+    fn into_uniform(self, name: &str) -> Uniform {
+        Uniform::TextureCube(name.to_string(), self.id())
     }
 }
