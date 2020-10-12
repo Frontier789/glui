@@ -10,6 +10,7 @@ For a GUI example, see `src\bin.rs`
 [Skyrace](https://github.com/frontier789/skyrace), my computer graphics assignment for University of Trento.
 
 ## Dependencies
-glutin for windowing
-image for image loading
-rusttype for font loading and caching
+The engine depends on the floowing public domain libraries:
+ - glutin for windowing
+ - image for image loading
+ - rusttype for font loading and caching
